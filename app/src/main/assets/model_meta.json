@@ -1,0 +1,18 @@
+{
+  "mean": [0.2693, 3.3516, 9.3094, -0.0018, 0.0002, 0.0031],
+  "std": [0.9552, 1.1246, 2.2726, 0.3554, 0.2906, 0.2520],
+  "feature_order": ["acc_x", "acc_y", "acc_z", "gyro_x", "gyro_y", "gyro_z"],
+  "units": {
+    "acc_x": "m/s^2",
+    "acc_y": "m/s^2",
+    "acc_z": "m/s^2",
+    "gyro_x": "rad/s",
+    "gyro_y": "rad/s",
+    "gyro_z": "rad/s"
+  },
+  "classes": ["walking", "stairs_up", "stairs_down"],
+  "window_size": 100,
+  "step_size": 50,
+  "sample_rate": 50,
+  "input_shape": [1, 100, 6]
+}
