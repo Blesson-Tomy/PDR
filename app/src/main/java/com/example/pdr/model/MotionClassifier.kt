@@ -10,10 +10,14 @@ import java.nio.channels.FileChannel
 /**
  * Manages the TFLite model for motion classification.
  */
-class MotionClassifier(context: Context, modelFileName: String = "model.tflite") {
+class MotionClassifier(
+    context: Context,
+    modelFileName: String = "model_v2.tflite", // Changed to v2 model
+    metaDataFileName: String = "model_meta_v2.json" // Changed to v2 metadata
+) {
 
     // Load metadata safely using the MotionMeta class.
-    val meta: MotionMeta = MotionMeta.fromAssets(context)
+    val meta: MotionMeta = MotionMeta.fromAssets(context, metaDataFileName)
 
     private val interpreter: Interpreter
 
@@ -39,13 +43,14 @@ class MotionClassifier(context: Context, modelFileName: String = "model.tflite")
      * @return A FloatArray of probabilities for each class.
      */
     fun predict(data: Array<FloatArray>): FloatArray {
-        // 1. Create the input ByteBuffer
-        val inputBuffer = ByteBuffer.allocateDirect(1 * meta.windowSize * 6 * 4) // 1 batch, 100 window, 6 features, 4 bytes/float
+        // 1. Create the input ByteBuffer (updated for 4 features)
+        val numFeatures = 4
+        val inputBuffer = ByteBuffer.allocateDirect(1 * meta.windowSize * numFeatures * 4) // 1 batch, 100 window, 4 features, 4 bytes/float
         inputBuffer.order(ByteOrder.nativeOrder())
 
-        // 2. Normalize and fill the ByteBuffer
+        // 2. Normalize and fill the ByteBuffer (updated for 4 features)
         for (i in 0 until meta.windowSize) {
-            for (j in 0 until 6) {
+            for (j in 0 until numFeatures) {
                 // Ensure we don't go out of bounds if data is smaller than expected
                 if (i < data.size && j < data[i].size) {
                     val normalizedValue = (data[i][j] - meta.mean[j]) / meta.std[j]

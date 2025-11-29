@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.pdr.model.MotionClassifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlin.math.sqrt
 
 class MotionViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -28,17 +29,21 @@ class MotionViewModel(application: Application) : AndroidViewModel(application) 
     private val confidenceThreshold = 0.75f
 
     /**
-     * Receives sensor data, buffers it, and triggers prediction.
+     * Receives sensor data, calculates magnitude, buffers it, and triggers prediction.
      */
-    fun onSensorDataReceived(accX: Float, accY: Float, accZ: Float, gyroX: Float, gyroY: Float, gyroZ: Float) {
-        sensorDataBuffer.add(floatArrayOf(accX, accY, accZ, gyroX, gyroY, gyroZ))
+    fun onSensorDataReceived(accX: Float, accY: Float, accZ: Float) {
+        // Calculate the fourth feature: accelerometer magnitude
+        val accMag = sqrt(accX * accX + accY * accY + accZ * accZ)
+
+        // Add all four features to the buffer
+        sensorDataBuffer.add(floatArrayOf(accX, accY, accZ, accMag))
 
         if (sensorDataBuffer.size == motionClassifier.meta.windowSize) {
             val dataToPredict = sensorDataBuffer.toTypedArray()
 
             viewModelScope.launch(Dispatchers.IO) {
                 val prediction = motionClassifier.predict(dataToPredict)
-                
+
                 // A more robust way to find the index and value of the max confidence
                 val predictedIndex = prediction.indices.maxByOrNull { prediction[it] } ?: -1
                 val maxConfidence = if (predictedIndex != -1) prediction[predictedIndex] else 0f
