@@ -3,6 +3,7 @@ package com.example.pdr.viewmodel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.compose.ui.geometry.Offset
@@ -14,8 +15,8 @@ class StepViewModel : ViewModel() {
     var windowSize by mutableFloatStateOf(6f)
     var debounce by mutableFloatStateOf(300f)
 
-    // Fixed stride length in pixels (can adjust)
-    var strideLength by mutableFloatStateOf(50f)
+    // User height in cm
+    var height by mutableStateOf("170")
 
     // Heading in radians (update from HeadingDetector)
     var heading by mutableFloatStateOf(0f)
@@ -24,9 +25,7 @@ class StepViewModel : ViewModel() {
     private var lastX by mutableFloatStateOf(0f)  // start at center
     private var lastY by mutableFloatStateOf(0f)
 
-
-
-    fun addStepDot() {
+    fun addStep(strideLength: Float) {
         val newPoint: Offset
 
         if (points.isEmpty()) {
@@ -44,12 +43,9 @@ class StepViewModel : ViewModel() {
         points.add(newPoint)
     }
 
-
-
     fun clearDots() {
         points.clear()
         lastX = 0f
         lastY = 0f
     }
-
 }
