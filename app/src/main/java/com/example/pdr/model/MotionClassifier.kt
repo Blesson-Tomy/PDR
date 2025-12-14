@@ -12,8 +12,8 @@ import java.nio.channels.FileChannel
  */
 class MotionClassifier(
     context: Context,
-    modelFileName: String = "model_v2.tflite", // Changed to v2 model
-    metaDataFileName: String = "model_meta_v2.json" // Changed to v2 metadata
+    modelFileName: String = "model_v4.tflite",
+    metaDataFileName: String = "model_meta_v4.json"
 ) {
 
     // Load metadata safely using the MotionMeta class.

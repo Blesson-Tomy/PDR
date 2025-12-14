@@ -26,6 +26,15 @@ import androidx.navigation.compose.rememberNavController
 import com.example.pdr.viewmodel.MotionViewModel
 import com.example.pdr.viewmodel.StepViewModel
 
+/**
+ * The main screen of the application, which sets up the navigation between the PDR and Settings screens.
+ *
+ * This composable uses a [Scaffold] to provide a standard layout structure, including a
+ * [BottomAppBar] for navigation. A [NavHost] is used to swap between the different screens.
+ *
+ * @param stepViewModel The ViewModel for the PDR system.
+ * @param motionViewModel The ViewModel for motion classification.
+ */
 @Composable
 fun MainScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
     val navController = rememberNavController()
@@ -34,7 +43,7 @@ fun MainScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
         bottomBar = {
             BottomAppBar {
                 NavigationBar {
-                    // PDR Screen Destination
+                    // Navigation item for the PDR (main) screen.
                     NavigationBarItem(
                         icon = { Icon(Icons.Filled.Place, contentDescription = "PDR") },
                         label = { Text("PDR") },
@@ -46,7 +55,7 @@ fun MainScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
                             }
                         }
                     )
-                    // Settings Screen Destination
+                    // Navigation item for the Settings screen.
                     NavigationBarItem(
                         icon = { Icon(Icons.Filled.Settings, contentDescription = "Settings") },
                         label = { Text("Settings") },
@@ -62,14 +71,16 @@ fun MainScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
             }
         }
     ) { innerPadding ->
+        // The NavHost is the container for the different screens (destinations).
         NavHost(
             navController = navController,
             startDestination = "pdr",
             modifier = Modifier.padding(innerPadding),
-//            enterTransition = { EnterTransition.None },
-//            exitTransition = { ExitTransition.None },
-//            popEnterTransition = { EnterTransition.None },
-//            popExitTransition = { ExitTransition.None }
+            // Disable animations for a faster, more responsive feel between tabs.
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
         ) {
             composable("pdr") { PdrScreen(stepViewModel, motionViewModel) }
             composable("settings") { SettingsScreen(stepViewModel) }
@@ -77,24 +88,32 @@ fun MainScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
     }
 }
 
+/**
+ * The main PDR screen, which displays the user's path, motion data, and a compass.
+ */
 @Composable
 fun PdrScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
+    // State for handling pan, zoom, and rotation gestures on the canvas.
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
+    // Get the list of points to draw from the ViewModel.
     val points = stepViewModel.points
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Display the motion type and confidence
-        val confidencePercentage = (motionViewModel.confidence * 100).toInt()
-        Text(
-            text = "Motion Type: ${motionViewModel.motionType} ($confidencePercentage%)",
-            modifier = Modifier.padding(16.dp)
-        )
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Display the motion type and its confidence score from the MotionViewModel.
+            val confidencePercentage = (motionViewModel.confidence * 100).toInt()
+            Text("Motion Type: ${motionViewModel.motionType} ($confidencePercentage%)")
+
+            // Display the last calculated stride length from the StepViewModel.
+            Text("Last Stride: ${"%.1f".format(stepViewModel.lastStrideLengthCm)} cm")
+        }
 
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
+                // Add gesture detection for pan and zoom.
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
                         scale *= zoom
@@ -102,6 +121,7 @@ fun PdrScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
                         offsetY += pan.y
                     }
                 }
+                // Apply the gesture transformations to the canvas.
                 .graphicsLayer(
                     scaleX = scale,
                     scaleY = scale,
@@ -109,34 +129,42 @@ fun PdrScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
                     translationY = offsetY
                 )
         ) {
+            // Center the coordinate system so (0,0) is in the middle of the canvas.
             val centerX = size.width / 2
             val centerY = size.height / 2
             translate(left = centerX, top = centerY) {
+                // Draw a light gray background.
                 drawRect(
                     color = Color.LightGray,
                     size = size,
                     topLeft = Offset(-centerX, -centerY)
                 )
 
-                // Draw points
+                // Draw a red circle for each point in the user's path.
                 for (p in points) {
                     drawCircle(color = Color.Red, radius = 10f, center = p)
                 }
 
-                // Compass
+                // --- Compass Drawing --- //
                 val compassRadius = 100f
-                val compassCenter = Offset(size.width / 2 - 150f, -(size.height / 2 - 150f))
+                val compassCenter = Offset(size.width / 2 - 150f, -(size.height / 2 - 150f)) // Top-right corner
+
+                // Draw the compass background circle.
                 drawCircle(
                     color = Color.Gray,
                     radius = compassRadius,
                     center = compassCenter,
                     style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f)
                 )
+
+                // Draw the red "North" line, which rotates based on the device's heading.
                 val northEnd = Offset(
                     compassCenter.x + compassRadius * kotlin.math.sin(-stepViewModel.heading),
                     compassCenter.y - compassRadius * kotlin.math.cos(-stepViewModel.heading)
                 )
                 drawLine(color = Color.Red, start = compassCenter, end = northEnd, strokeWidth = 4f)
+                
+                // Draw the blue arrow representing the user's current forward direction (always points up).
                 val headingEnd = Offset(
                     compassCenter.x + compassRadius * kotlin.math.sin(0f),
                     compassCenter.y - compassRadius * kotlin.math.cos(0f)
@@ -147,6 +175,9 @@ fun PdrScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
     }
 }
 
+/**
+ * The settings screen, which allows the user to configure the PDR algorithm and clear the path.
+ */
 @Composable
 fun SettingsScreen(stepViewModel: StepViewModel) {
     Column(
@@ -156,10 +187,12 @@ fun SettingsScreen(stepViewModel: StepViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Button to clear the PDR path.
         Button(onClick = { stepViewModel.clearDots() }) {
             Text("Clear Canvas")
         }
 
+        // Text field for the user to input their height.
         OutlinedTextField(
             value = stepViewModel.height,
             onValueChange = { stepViewModel.height = it },
@@ -168,6 +201,7 @@ fun SettingsScreen(stepViewModel: StepViewModel) {
             singleLine = true
         )
 
+        // Slider to adjust the step detection threshold.
         Text("Threshold: ${"%.1f".format(stepViewModel.threshold)}")
         Slider(
             value = stepViewModel.threshold,
@@ -176,6 +210,7 @@ fun SettingsScreen(stepViewModel: StepViewModel) {
             steps = ((20f - 5f) / 0.2f - 1).toInt()
         )
 
+        // Slider to adjust the size of the smoothing window.
         Text("Window Size: ${stepViewModel.windowSize.toInt()}")
         Slider(
             value = stepViewModel.windowSize,
@@ -183,6 +218,7 @@ fun SettingsScreen(stepViewModel: StepViewModel) {
             valueRange = 1f..20f
         )
 
+        // Slider to adjust the debounce time between steps.
         Text("Debounce (ms): ${stepViewModel.debounce.toInt()}")
         Slider(
             value = stepViewModel.debounce,
