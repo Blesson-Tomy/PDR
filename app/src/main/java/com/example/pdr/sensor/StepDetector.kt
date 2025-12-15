@@ -103,10 +103,10 @@ class StepDetector(
                     // Acceleration has risen again, indicating the step cycle is complete.
                     // Debounce to prevent multiple detections for a single physical step.
                     if (now - lastStepTime > stepViewModel.debounce.toLong()) {
-                        // Calculate stride length based on the recorded min/max acceleration.
-                        val strideLength = calculateStrideLength(now)
-                        // Report the new step and its stride length to the ViewModel.
-                        stepViewModel.addStep(strideLength)
+                        // Calculate stride length and cadence.
+                        val (strideLength, stepFrequency) = calculateStrideAndCadence(now)
+                        // Report the new step, its stride length, and its cadence to the ViewModel.
+                        stepViewModel.addStep(strideLength, stepFrequency)
                         lastStepTime = now
                     }
                     // Reset the state machine to wait for the next step.
@@ -119,27 +119,24 @@ class StepDetector(
     }
 
     /**
-     * Calculates the user's stride length in centimeters using a frequency-based (cadence) model.
-     * This is more robust than amplitude-based models as it's less affected by filtering and orientation.
+     * Calculates the user's stride length and cadence.
      *
      * @param currentTime The timestamp of the current step, used for calculating cadence.
-     * @return The calculated stride length in centimeters.
+     * @return A Pair containing the calculated stride length in cm and the cadence in steps/sec.
      */
-    private fun calculateStrideLength(currentTime: Long): Float {
-        // 1. Calculate Step Frequency (Steps per second)
-        // We clamp the timeDiff to avoid division by zero or unrealistic spikes from the first step.
+    private fun calculateStrideAndCadence(currentTime: Long): Pair<Float, Float> {
+        // 1. Calculate Step Frequency (Steps per second) / Cadence
         val timeDiffSeconds = ((currentTime - lastStepTime) / 1000f).coerceAtLeast(0.2f)
         val stepFrequency = 1f / timeDiffSeconds
 
         // 2. Get User Height (in cm) from the ViewModel.
-        val userHeightCm = stepViewModel.height.toFloatOrNull() ?: 170f
+        val userHeightCm = stepViewModel.height.toFloatOrNull() ?: 175f
 
         // 3. Algorithm: A linear model relating stride length to step frequency and height.
         // The formula is: StrideLength = Height * (K * Frequency + C)
-        // K (Slope) represents how much stride lengthens with speed.
-        // C (Intercept) represents the base stride-to-height ratio.
-        val K = 0.30f // Coefficient for frequency impact
-        val C = 0.15f // Intercept constant for base stride factor
+        // K and C are now sourced from the StepViewModel to be tunable from the UI.
+        val K = stepViewModel.kValue
+        val C = stepViewModel.cValue
 
         // The relationship is not purely linear; running has a different gait. We use a larger
         // coefficient if the frequency suggests the user is running (e.g., > 2.0 steps/sec).
@@ -151,9 +148,10 @@ class StepDetector(
         // 4. Sanity Check / Clamping
         // Clamp the result to a realistic range based on the user's height to filter out anomalies.
         val minStride = userHeightCm * 0.2f // A very small step
-        val maxStride = userHeightCm * 0.8f // A very large leap
+        val maxStride = userHeightCm * 1.2f // A very large leap
+        val finalStride = calculatedStrideCm.coerceIn(minStride, maxStride)
 
-        return calculatedStrideCm.coerceIn(minStride, maxStride)
+        return Pair(finalStride, stepFrequency)
     }
 
     /**

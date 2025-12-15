@@ -108,6 +108,9 @@ fun PdrScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
 
             // Display the last calculated stride length from the StepViewModel.
             Text("Last Stride: ${"%.1f".format(stepViewModel.lastStrideLengthCm)} cm")
+
+            // Display the average cadence over the last few steps.
+            Text("Average Cadence: ${"%.2f".format(stepViewModel.averageCadence)} steps/sec")
         }
 
         Canvas(
@@ -201,7 +204,24 @@ fun SettingsScreen(stepViewModel: StepViewModel) {
             singleLine = true
         )
 
-        // Slider to adjust the step detection threshold.
+        // --- Stride Calculation Parameters ---
+        Text("K (Frequency Factor): ${"%.2f".format(stepViewModel.kValue)}")
+        Text("Controls how much stride length increases with speed.", style = MaterialTheme.typography.bodySmall)
+        Slider(
+            value = stepViewModel.kValue,
+            onValueChange = { stepViewModel.kValue = it },
+            valueRange = 0.1f..1.0f
+        )
+
+        Text("C (Base Stride Factor): ${"%.2f".format(stepViewModel.cValue)}")
+        Text("Determines base stride length as a percent of height.", style = MaterialTheme.typography.bodySmall)
+        Slider(
+            value = stepViewModel.cValue,
+            onValueChange = { stepViewModel.cValue = it },
+            valueRange = 0.05f..0.5f
+        )
+
+        // --- Step Detection Parameters ---
         Text("Threshold: ${"%.1f".format(stepViewModel.threshold)}")
         Slider(
             value = stepViewModel.threshold,
@@ -210,7 +230,6 @@ fun SettingsScreen(stepViewModel: StepViewModel) {
             steps = ((20f - 5f) / 0.2f - 1).toInt()
         )
 
-        // Slider to adjust the size of the smoothing window.
         Text("Window Size: ${stepViewModel.windowSize.toInt()}")
         Slider(
             value = stepViewModel.windowSize,
@@ -218,13 +237,19 @@ fun SettingsScreen(stepViewModel: StepViewModel) {
             valueRange = 1f..20f
         )
 
-        // Slider to adjust the debounce time between steps.
         Text("Debounce (ms): ${stepViewModel.debounce.toInt()}")
         Slider(
             value = stepViewModel.debounce,
             onValueChange = { stepViewModel.debounce = it },
             valueRange = 100f..600f,
             steps = ((600f - 100f) / 20f - 1).toInt()
+        )
+
+        Text("Cadence Average Size: ${stepViewModel.cadenceAverageSize.toInt()}")
+        Slider(
+            value = stepViewModel.cadenceAverageSize,
+            onValueChange = { stepViewModel.cadenceAverageSize = it },
+            valueRange = 1f..20f
         )
     }
 }
