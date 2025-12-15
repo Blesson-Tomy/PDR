@@ -6,15 +6,14 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import com.example.pdr.viewmodel.MotionViewModel
 import com.example.pdr.viewmodel.StepViewModel
-import kotlin.math.pow
 import kotlin.math.sqrt
 
 /**
  * Detects steps using the device's accelerometer and calculates the stride length for each step.
  *
  * This class implements a simple state machine to identify step events based on the accelerometer's
- * magnitude data. It uses the Weinberg model to estimate stride length, incorporating factors like
- * acceleration peaks, user height, and cadence (time between steps).
+ * magnitude data. It uses a frequency-based model to estimate stride length, which is more robust
+ * than amplitude-based models against filtering and sensor orientation issues.
  *
  * @param sensorManager The system's sensor manager to access the accelerometer.
  * @param stepViewModel The ViewModel to which new steps (with their calculated stride length) are reported.
@@ -36,10 +35,6 @@ class StepDetector(
     private var currentStepMinAcc = 0f
     // A sliding window of recent accelerometer magnitude readings to smooth out the data.
     private val magnitudeWindow = mutableListOf<Float>()
-
-    // A calibration constant for the Weinberg stride length model. This value can be tuned
-    // for better accuracy or made a user-configurable setting.
-    private val K = 0.4f
 
     /**
      * Registers the listener for the accelerometer to start detecting steps.
@@ -124,36 +119,41 @@ class StepDetector(
     }
 
     /**
-     * Calculates the user's stride length in centimeters using a formula that combines
-     * acceleration, user height, and cadence.
+     * Calculates the user's stride length in centimeters using a frequency-based (cadence) model.
+     * This is more robust than amplitude-based models as it's less affected by filtering and orientation.
      *
      * @param currentTime The timestamp of the current step, used for calculating cadence.
      * @return The calculated stride length in centimeters.
      */
     private fun calculateStrideLength(currentTime: Long): Float {
-        // The difference between peak (max) and valley (min) acceleration during the step.
-        val accDiff = currentStepMaxAcc - currentStepMinAcc
-        // Safely get the user's height from the ViewModel, with a default fallback.
-        val userHeight = stepViewModel.height.toFloatOrNull() ?: 170f
-        // Time elapsed since the last step, in seconds. This represents the cadence.
-        val timeDiff = (currentTime - lastStepTime) / 1000f // in seconds
+        // 1. Calculate Step Frequency (Steps per second)
+        // We clamp the timeDiff to avoid division by zero or unrealistic spikes from the first step.
+        val timeDiffSeconds = ((currentTime - lastStepTime) / 1000f).coerceAtLeast(0.2f)
+        val stepFrequency = 1f / timeDiffSeconds
 
-        // **Weinberg Model**: A common algorithm for stride length estimation.
-        // It states that stride length is proportional to the 4th root of the acceleration difference.
-        // The constant K is a calibration factor.
-        val weinbergStride = K * accDiff.pow(0.25f)
+        // 2. Get User Height (in cm) from the ViewModel.
+        val userHeightCm = stepViewModel.height.toFloatOrNull() ?: 170f
 
-        // **Adjustment Factors**: We refine the Weinberg model with other data.
-        // Normalize by the user's height relative to an average height (170cm). Taller people generally have longer strides.
-        val heightFactor = userHeight / 170f
-        // Increase stride length slightly for a faster cadence (shorter time between steps).
-        val cadenceFactor = if (timeDiff > 0.5f) 1.0f else 1.0f + (0.5f - timeDiff) // walk faster, stride longer
+        // 3. Algorithm: A linear model relating stride length to step frequency and height.
+        // The formula is: StrideLength = Height * (K * Frequency + C)
+        // K (Slope) represents how much stride lengthens with speed.
+        // C (Intercept) represents the base stride-to-height ratio.
+        val K = 0.30f // Coefficient for frequency impact
+        val C = 0.15f // Intercept constant for base stride factor
 
-        // Combine the base stride with the adjustment factors and convert to centimeters.
-        val finalStrideCm = (weinbergStride * heightFactor * cadenceFactor) * 100f // Convert to cm
+        // The relationship is not purely linear; running has a different gait. We use a larger
+        // coefficient if the frequency suggests the user is running (e.g., > 2.0 steps/sec).
+        val dynamicK = if (stepFrequency > 2.0f) 0.5f else K
 
-        // Finally, clamp the result to a realistic range (e.g., 30cm to 150cm) to filter out noise or errors.
-        return finalStrideCm.coerceIn(30f, 150f)
+        // Calculate the final stride length in centimeters.
+        val calculatedStrideCm = userHeightCm * (dynamicK * stepFrequency + C)
+
+        // 4. Sanity Check / Clamping
+        // Clamp the result to a realistic range based on the user's height to filter out anomalies.
+        val minStride = userHeightCm * 0.2f // A very small step
+        val maxStride = userHeightCm * 0.8f // A very large leap
+
+        return calculatedStrideCm.coerceIn(minStride, maxStride)
     }
 
     /**

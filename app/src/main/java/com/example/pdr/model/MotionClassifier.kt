@@ -12,7 +12,7 @@ import java.nio.channels.FileChannel
  */
 class MotionClassifier(
     context: Context,
-    modelFileName: String = "model_v4.tflite",
+    modelFileName: String = "model_v5.tflite",
     metaDataFileName: String = "model_meta_v4.json"
 ) {
 
