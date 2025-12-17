@@ -4,6 +4,7 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -154,15 +155,24 @@ fun PdrScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
-                    detectTransformGestures { centroid, pan, zoom, _ ->
-                        val newScale = (scale * zoom).coerceIn(0.1f, 10f)
-                        val zoomFactor = newScale / scale // Calculate the actual zoom factor after coercion
+                    if (stepViewModel.isSettingOrigin) {
+                        detectTapGestures {
+                            // Convert tap location to canvas coordinates
+                            val canvasX = (it.x - offsetX) / scale
+                            val canvasY = (it.y - offsetY) / scale
+                            stepViewModel.setNewOrigin(Offset(canvasX, canvasY))
+                        }
+                    } else {
+                        detectTransformGestures { centroid, pan, zoom, _ ->
+                            val newScale = (scale * zoom).coerceIn(0.1f, 10f)
+                            val zoomFactor = newScale / scale // Calculate the actual zoom factor after coercion
 
-                        // Update offset to center zoom around the gesture centroid
-                        offsetX = (offsetX - centroid.x) * zoomFactor + centroid.x + pan.x
-                        offsetY = (offsetY - centroid.y) * zoomFactor + centroid.y + pan.y
-                        
-                        scale = newScale
+                            // Update offset to center zoom around the gesture centroid
+                            offsetX = (offsetX - centroid.x) * zoomFactor + centroid.x + pan.x
+                            offsetY = (offsetY - centroid.y) * zoomFactor + centroid.y + pan.y
+                            
+                            scale = newScale
+                        }
                     }
                 }
                 .graphicsLayer(
@@ -263,6 +273,14 @@ fun PdrScreen(
                 compassCenter.y - compassRadius
             )
             drawLine(color = Color.Blue, start = compassCenter, end = headingEnd, strokeWidth = 5.dp.toPx())
+        }
+        
+        // Button to set a new origin
+        Button(
+            onClick = { stepViewModel.toggleIsSettingOrigin() },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+        ) {
+            Text(if (stepViewModel.isSettingOrigin) "Tap to set origin" else "Set Origin")
         }
     }
 }
