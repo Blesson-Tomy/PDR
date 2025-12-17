@@ -38,8 +38,8 @@ class StepViewModel : ViewModel() {
     var cValue by mutableFloatStateOf(0.15f)
 
     // --- UI Control ---
-    // If true, the canvas will show the static floor plan. Otherwise, it shows the live PDR path.
-    var showFloorPlan by mutableStateOf(false)
+    // If true, the canvas will show the static floor plan. Otherwi se, it shows the live PDR path.
+    var showFloorPlan by mutableStateOf(true)
     // When true, the next tap on the canvas will set a new origin point.
     var isSettingOrigin by mutableStateOf(false)
 

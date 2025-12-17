@@ -112,6 +112,7 @@ fun PdrScreen(
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
+    var rotation by remember { mutableFloatStateOf(0f) }
     // Get the list of points to draw from the ViewModel.
     val points = stepViewModel.points
     val walls = floorPlanViewModel.walls
@@ -154,23 +155,26 @@ fun PdrScreen(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
+                .pointerInput(stepViewModel.isSettingOrigin) { // Key this to the state
                     if (stepViewModel.isSettingOrigin) {
                         detectTapGestures {
-                            // Convert tap location to canvas coordinates
-                            val canvasX = (it.x - offsetX) / scale
-                            val canvasY = (it.y - offsetY) / scale
-                            stepViewModel.setNewOrigin(Offset(canvasX, canvasY))
+                            val centerX = size.width / 2f
+                            val centerY = size.height / 2f
+                            // Reverse the transformations to find the tap point in world coordinates
+                            val worldX = (it.x - offsetX) / scale - centerX
+                            val worldY = (it.y - offsetY) / scale - centerY
+
+                            stepViewModel.setNewOrigin(Offset(worldX, worldY))
                         }
                     } else {
-                        detectTransformGestures { centroid, pan, zoom, _ ->
+                        detectTransformGestures { centroid, pan, zoom, rotationChange ->
                             val newScale = (scale * zoom).coerceIn(0.1f, 10f)
                             val zoomFactor = newScale / scale // Calculate the actual zoom factor after coercion
 
                             // Update offset to center zoom around the gesture centroid
                             offsetX = (offsetX - centroid.x) * zoomFactor + centroid.x + pan.x
                             offsetY = (offsetY - centroid.y) * zoomFactor + centroid.y + pan.y
-                            
+                            rotation += rotationChange
                             scale = newScale
                         }
                     }
@@ -180,6 +184,7 @@ fun PdrScreen(
                     scaleY = scale,
                     translationX = offsetX,
                     translationY = offsetY,
+                    rotationZ = rotation,
                     transformOrigin = TransformOrigin(0f, 0f)
                 )
         ) {
@@ -275,12 +280,19 @@ fun PdrScreen(
             drawLine(color = Color.Blue, start = compassCenter, end = headingEnd, strokeWidth = 5.dp.toPx())
         }
         
-        // Button to set a new origin
-        Button(
-            onClick = { stepViewModel.toggleIsSettingOrigin() },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+        // Buttons for canvas control
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(if (stepViewModel.isSettingOrigin) "Tap to set origin" else "Set Origin")
+            Button(onClick = { stepViewModel.toggleIsSettingOrigin() }) {
+                Text(if (stepViewModel.isSettingOrigin) "Tap to set origin" else "Set Origin")
+            }
+            Button(onClick = { stepViewModel.clearDots() }) {
+                Text("Clear Canvas")
+            }
         }
     }
 }
@@ -297,10 +309,6 @@ fun SettingsScreen(stepViewModel: StepViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Button to clear the PDR path.
-        Button(onClick = { stepViewModel.clearDots() }) {
-            Text("Clear Canvas")
-        }
 
         // Text field for the user to input their height.
         OutlinedTextField(
@@ -311,7 +319,7 @@ fun SettingsScreen(stepViewModel: StepViewModel) {
             singleLine = true
         )
 
-        // --- UI Control ---
+        // --- UI Control --
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Show Floor Plan")
             Spacer(modifier = Modifier.width(8.dp))
@@ -321,7 +329,7 @@ fun SettingsScreen(stepViewModel: StepViewModel) {
             )
         }
 
-        // --- Stride Calculation Parameters ---
+        // --- Stride Calculation Parameters --
         Text("K (Frequency Factor): ${"%.2f".format(stepViewModel.kValue)}")
         Text("Controls how much stride length increases with speed.", style = MaterialTheme.typography.bodySmall)
         Slider(
@@ -338,7 +346,7 @@ fun SettingsScreen(stepViewModel: StepViewModel) {
             valueRange = 0.05f..0.5f
         )
 
-        // --- Step Detection Parameters ---
+        // --- Step Detection Parameters --
         Text("Threshold: ${"%.1f".format(stepViewModel.threshold)}")
         Slider(
             value = stepViewModel.threshold,
