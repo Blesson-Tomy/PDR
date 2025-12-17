@@ -3,8 +3,10 @@ package com.example.pdr.ui
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
@@ -51,33 +53,31 @@ fun MainScreen(
 
     Scaffold(
         bottomBar = {
-            BottomAppBar {
-                NavigationBar {
-                    // Navigation item for the PDR (main) screen.
-                    NavigationBarItem(
-                        icon = { Icon(Icons.Filled.Place, contentDescription = "PDR") },
-                        label = { Text("PDR") },
-                        selected = navController.currentDestination?.route == "pdr",
-                        onClick = {
-                            navController.navigate("pdr") {
-                                popUpTo(navController.graph.startDestinationId)
-                                launchSingleTop = true
-                            }
+            NavigationBar {
+                // Navigation item for the PDR (main) screen.
+                NavigationBarItem(
+                    icon = { Icon(Icons.Filled.Place, contentDescription = "PDR") },
+                    label = { Text("PDR") },
+                    selected = navController.currentDestination?.route == "pdr",
+                    onClick = {
+                        navController.navigate("pdr") {
+                            popUpTo(navController.graph.startDestinationId)
+                            launchSingleTop = true
                         }
-                    )
-                    // Navigation item for the Settings screen.
-                    NavigationBarItem(
-                        icon = { Icon(Icons.Filled.Settings, contentDescription = "Settings") },
-                        label = { Text("Settings") },
-                        selected = navController.currentDestination?.route == "settings",
-                        onClick = {
-                            navController.navigate("settings") {
-                                popUpTo(navController.graph.startDestinationId)
-                                launchSingleTop = true
-                            }
+                    }
+                )
+                // Navigation item for the Settings screen.
+                NavigationBarItem(
+                    icon = { Icon(Icons.Filled.Settings, contentDescription = "Settings") },
+                    label = { Text("Settings") },
+                    selected = navController.currentDestination?.route == "settings",
+                    onClick = {
+                        navController.navigate("settings") {
+                            popUpTo(navController.graph.startDestinationId)
+                            launchSingleTop = true
                         }
-                    )
-                }
+                    }
+                )
             }
         }
     ) { innerPadding ->
@@ -148,109 +148,121 @@ fun PdrScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Display the motion type and its confidence score from the MotionViewModel.
-            val confidencePercentage = (motionViewModel.confidence * 100).toInt()
-            Text("Motion Type: ${motionViewModel.motionType} ($confidencePercentage%)")
+    Box(modifier = Modifier.fillMaxSize()) {
+        // The main canvas for drawing the map and PDR path.
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTransformGestures { centroid, pan, zoom, _ ->
+                        val newScale = (scale * zoom).coerceIn(0.1f, 10f)
+                        val zoomFactor = newScale / scale // Calculate the actual zoom factor after coercion
 
-            // Display the last calculated stride length from the StepViewModel.
-            Text("Last Stride: ${"%.1f".format(stepViewModel.lastStrideLengthCm)} cm")
-
-            // Display the average cadence over the last few steps.
-            Text("Average Cadence: ${"%.2f".format(stepViewModel.averageCadence)} steps/sec")
-        }
-
-        Box(modifier = Modifier.fillMaxSize()) {
-            // The main canvas for drawing the map and PDR path.
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTransformGestures { centroid, pan, zoom, _ ->
-                            val newScale = (scale * zoom).coerceIn(0.1f, 10f)
-                            val zoomFactor = newScale / scale // Calculate the actual zoom factor after coercion
-
-                            // Update offset to center zoom around the gesture centroid
-                            offsetX = (offsetX - centroid.x) * zoomFactor + centroid.x + pan.x
-                            offsetY = (offsetY - centroid.y) * zoomFactor + centroid.y + pan.y
-                            
-                            scale = newScale
-                        }
-                    }
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale,
-                        translationX = offsetX,
-                        translationY = offsetY,
-                        transformOrigin = TransformOrigin(0f, 0f)
-                    )
-            ) {
-                // Center the coordinate system so (0,0) is in the middle of the canvas.
-                val centerX = size.width / 2
-                val centerY = size.height / 2
-                translate(left = centerX, top = centerY) {
-                    // Create an "infinite" background.
-                    val padding = 500f
-                    val backgroundTopLeft = Offset(contentBounds.left - padding, contentBounds.top - padding)
-                    val backgroundSize = Size(contentBounds.width + padding * 2, contentBounds.height + padding * 2)
-
-                    drawRect(
-                        color = Color.LightGray,
-                        topLeft = backgroundTopLeft,
-                        size = backgroundSize
-                    )
-
-                    if (stepViewModel.showFloorPlan) {
-                        // Draw the floor plan.
-                        for (wall in walls) {
-                            drawLine(
-                                color = Color.Black,
-                                start = Offset(wall.x1, wall.y1),
-                                end = Offset(wall.x2, wall.y2),
-                                strokeWidth = 5f / scale // Keep stroke width consistent when zooming
-                            )
-                        }
-                    }
-                    // Always draw the PDR path on top.
-                    for (p in points) {
-                        drawCircle(color = Color.Red, radius = 10f / scale, center = p)
+                        // Update offset to center zoom around the gesture centroid
+                        offsetX = (offsetX - centroid.x) * zoomFactor + centroid.x + pan.x
+                        offsetY = (offsetY - centroid.y) * zoomFactor + centroid.y + pan.y
+                        
+                        scale = newScale
                     }
                 }
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offsetX,
+                    translationY = offsetY,
+                    transformOrigin = TransformOrigin(0f, 0f)
+                )
+        ) {
+            // Center the coordinate system so (0,0) is in the middle of the canvas.
+            val centerX = size.width / 2
+            val centerY = size.height / 2
+            translate(left = centerX, top = centerY) {
+                // Create an "infinite" background.
+                val padding = 500f
+                val backgroundTopLeft = Offset(contentBounds.left - padding, contentBounds.top - padding)
+                val backgroundSize = Size(contentBounds.width + padding * 2, contentBounds.height + padding * 2)
+
+                drawRect(
+                    color = Color.LightGray,
+                    topLeft = backgroundTopLeft,
+                    size = backgroundSize
+                )
+
+                if (stepViewModel.showFloorPlan) {
+                    // Draw the floor plan.
+                    for (wall in walls) {
+                        drawLine(
+                            color = Color.Black,
+                            start = Offset(wall.x1, wall.y1),
+                            end = Offset(wall.x2, wall.y2),
+                            strokeWidth = 5f / scale // Keep stroke width consistent when zooming
+                        )
+                    }
+                }
+                // Always draw the PDR path on top.
+                for (p in points) {
+                    drawCircle(color = Color.Red, radius = 10f / scale, center = p)
+                }
             }
-
-            // A separate, fixed canvas for the compass overlay.
-            Canvas(
-                modifier = Modifier
-                    .size(120.dp)
-                    .padding(16.dp)
-                    .align(Alignment.TopEnd)
-            ) {
-                val compassRadius = (size.minDimension / 2) * 0.9f
-                val compassCenter = center
-
-                // Draw the compass background circle.
-                drawCircle(
-                    color = Color.DarkGray,
-                    radius = compassRadius,
-                    center = compassCenter,
-                    style = Stroke(width = 4.dp.toPx())
+        }
+        // Box for the labels in the top-left corner.
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                    shape = RoundedCornerShape(8.dp)
                 )
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            val confidencePercentage = (motionViewModel.confidence * 100).toInt()
+            Text(
+                text = "Motion Type: ${motionViewModel.motionType} ($confidencePercentage%)",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "Last Stride: ${"%.1f".format(stepViewModel.lastStrideLengthCm)} cm",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "Average Cadence: ${"%.2f".format(stepViewModel.averageCadence)} steps/sec",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
 
-                // Draw the red "North" line, which rotates based on the device's heading.
-                val northEnd = Offset(
-                    compassCenter.x + compassRadius * kotlin.math.sin(-stepViewModel.heading),
-                    compassCenter.y - compassRadius * kotlin.math.cos(-stepViewModel.heading)
-                )
-                drawLine(color = Color.Red, start = compassCenter, end = northEnd, strokeWidth = 4.dp.toPx())
+        // A separate, fixed canvas for the compass overlay.
+        Canvas(
+            modifier = Modifier
+                .size(120.dp)
+                .padding(16.dp)
+                .align(Alignment.TopEnd)
+        ) {
+            val compassRadius = (size.minDimension / 2) * 0.9f
+            val compassCenter = center
 
-                // Draw the blue arrow representing the user's current forward direction (always points up).
-                val headingEnd = Offset(
-                    compassCenter.x,
-                    compassCenter.y - compassRadius
-                )
-                drawLine(color = Color.Blue, start = compassCenter, end = headingEnd, strokeWidth = 5.dp.toPx())
-            }
+            // Draw the compass background circle.
+            drawCircle(
+                color = Color.DarkGray,
+                radius = compassRadius,
+                center = compassCenter,
+                style = Stroke(width = 4.dp.toPx())
+            )
+
+            // Draw the red "North" line, which rotates based on the device's heading.
+            val northEnd = Offset(
+                compassCenter.x + compassRadius * kotlin.math.sin(-stepViewModel.heading),
+                compassCenter.y - compassRadius * kotlin.math.cos(-stepViewModel.heading)
+            )
+            drawLine(color = Color.Red, start = compassCenter, end = northEnd, strokeWidth = 4.dp.toPx())
+
+            // Draw the blue arrow representing the user's current forward direction (always points up).
+            val headingEnd = Offset(
+                compassCenter.x,
+                compassCenter.y - compassRadius
+            )
+            drawLine(color = Color.Blue, start = compassCenter, end = headingEnd, strokeWidth = 5.dp.toPx())
         }
     }
 }
