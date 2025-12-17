@@ -29,13 +29,17 @@ class StepViewModel : ViewModel() {
     var debounce by mutableFloatStateOf(300f)
 
     // The user's height in centimeters, provided via the settings screen.
-    var height by mutableStateOf("175")
+    var height by mutableStateOf("170")
 
     // --- Stride Calculation Parameters ---
     // Coefficient for the impact of frequency on stride length.
     var kValue by mutableFloatStateOf(0.37f)
     // Intercept constant for the base stride-to-height ratio.
     var cValue by mutableFloatStateOf(0.15f)
+
+    // --- UI Control ---
+    // If true, the canvas will show the static floor plan. Otherwise, it shows the live PDR path.
+    var showFloorPlan by mutableStateOf(false)
 
     // The current heading of the device in radians, updated by the HeadingDetector.
     var heading by mutableFloatStateOf(0f)

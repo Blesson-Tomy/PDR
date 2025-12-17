@@ -14,7 +14,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -23,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.pdr.viewmodel.FloorPlanViewModel
 import com.example.pdr.viewmodel.MotionViewModel
 import com.example.pdr.viewmodel.StepViewModel
 
@@ -34,9 +39,14 @@ import com.example.pdr.viewmodel.StepViewModel
  *
  * @param stepViewModel The ViewModel for the PDR system.
  * @param motionViewModel The ViewModel for motion classification.
+ * @param floorPlanViewModel The ViewModel for the floor plan.
  */
 @Composable
-fun MainScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
+fun MainScreen(
+    stepViewModel: StepViewModel,
+    motionViewModel: MotionViewModel,
+    floorPlanViewModel: FloorPlanViewModel
+) {
     val navController = rememberNavController()
 
     Scaffold(
@@ -82,7 +92,7 @@ fun MainScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
             popEnterTransition = { EnterTransition.None },
             popExitTransition = { ExitTransition.None }
         ) {
-            composable("pdr") { PdrScreen(stepViewModel, motionViewModel) }
+            composable("pdr") { PdrScreen(stepViewModel, motionViewModel, floorPlanViewModel) }
             composable("settings") { SettingsScreen(stepViewModel) }
         }
     }
@@ -92,13 +102,51 @@ fun MainScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
  * The main PDR screen, which displays the user's path, motion data, and a compass.
  */
 @Composable
-fun PdrScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
+fun PdrScreen(
+    stepViewModel: StepViewModel,
+    motionViewModel: MotionViewModel,
+    floorPlanViewModel: FloorPlanViewModel
+) {
     // State for handling pan, zoom, and rotation gestures on the canvas.
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
     // Get the list of points to draw from the ViewModel.
     val points = stepViewModel.points
+    val walls = floorPlanViewModel.walls
+
+    // Calculate the bounding box that contains all drawable content (walls and PDR points).
+    val contentBounds = remember(walls, points) {
+        if (walls.isEmpty() && points.isEmpty()) {
+            // If there's nothing to draw, provide a default 1000x1000 area.
+            return@remember Rect(-500f, -500f, 500f, 500f)
+        }
+
+        var minX = Float.POSITIVE_INFINITY
+        var minY = Float.POSITIVE_INFINITY
+        var maxX = Float.NEGATIVE_INFINITY
+        var maxY = Float.NEGATIVE_INFINITY
+
+        walls.forEach { wall ->
+            minX = minOf(minX, wall.x1, wall.x2)
+            minY = minOf(minY, wall.y1, wall.y2)
+            maxX = maxOf(maxX, wall.x1, wall.x2)
+            maxY = maxOf(maxY, wall.y1, wall.y2)
+        }
+
+        points.forEach { p ->
+            minX = minOf(minX, p.x)
+            minY = minOf(minY, p.y)
+            maxX = maxOf(maxX, p.x)
+            maxY = maxOf(maxY, p.y)
+        }
+
+        if (minX == Float.POSITIVE_INFINITY) {
+            Rect(-500f, -500f, 500f, 500f)
+        } else {
+            Rect(minX, minY, maxX, maxY)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -113,51 +161,80 @@ fun PdrScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
             Text("Average Cadence: ${"%.2f".format(stepViewModel.averageCadence)} steps/sec")
         }
 
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                // Add gesture detection for pan and zoom.
-                .pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale *= zoom
-                        offsetX += pan.x
-                        offsetY += pan.y
+        Box(modifier = Modifier.fillMaxSize()) {
+            // The main canvas for drawing the map and PDR path.
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTransformGestures { centroid, pan, zoom, _ ->
+                            val newScale = (scale * zoom).coerceIn(0.1f, 10f)
+                            val zoomFactor = newScale / scale // Calculate the actual zoom factor after coercion
+
+                            // Update offset to center zoom around the gesture centroid
+                            offsetX = (offsetX - centroid.x) * zoomFactor + centroid.x + pan.x
+                            offsetY = (offsetY - centroid.y) * zoomFactor + centroid.y + pan.y
+                            
+                            scale = newScale
+                        }
+                    }
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offsetX,
+                        translationY = offsetY,
+                        transformOrigin = TransformOrigin(0f, 0f)
+                    )
+            ) {
+                // Center the coordinate system so (0,0) is in the middle of the canvas.
+                val centerX = size.width / 2
+                val centerY = size.height / 2
+                translate(left = centerX, top = centerY) {
+                    // Create an "infinite" background.
+                    val padding = 500f
+                    val backgroundTopLeft = Offset(contentBounds.left - padding, contentBounds.top - padding)
+                    val backgroundSize = Size(contentBounds.width + padding * 2, contentBounds.height + padding * 2)
+
+                    drawRect(
+                        color = Color.LightGray,
+                        topLeft = backgroundTopLeft,
+                        size = backgroundSize
+                    )
+
+                    if (stepViewModel.showFloorPlan) {
+                        // Draw the floor plan.
+                        for (wall in walls) {
+                            drawLine(
+                                color = Color.Black,
+                                start = Offset(wall.x1, wall.y1),
+                                end = Offset(wall.x2, wall.y2),
+                                strokeWidth = 5f / scale // Keep stroke width consistent when zooming
+                            )
+                        }
+                    }
+                    // Always draw the PDR path on top.
+                    for (p in points) {
+                        drawCircle(color = Color.Red, radius = 10f / scale, center = p)
                     }
                 }
-                // Apply the gesture transformations to the canvas.
-                .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offsetX,
-                    translationY = offsetY
-                )
-        ) {
-            // Center the coordinate system so (0,0) is in the middle of the canvas.
-            val centerX = size.width / 2
-            val centerY = size.height / 2
-            translate(left = centerX, top = centerY) {
-                // Draw a light gray background.
-                drawRect(
-                    color = Color.LightGray,
-                    size = size,
-                    topLeft = Offset(-centerX, -centerY)
-                )
+            }
 
-                // Draw a red circle for each point in the user's path.
-                for (p in points) {
-                    drawCircle(color = Color.Red, radius = 10f, center = p)
-                }
-
-                // --- Compass Drawing --- //
-                val compassRadius = 100f
-                val compassCenter = Offset(size.width / 2 - 150f, -(size.height / 2 - 150f)) // Top-right corner
+            // A separate, fixed canvas for the compass overlay.
+            Canvas(
+                modifier = Modifier
+                    .size(120.dp)
+                    .padding(16.dp)
+                    .align(Alignment.TopEnd)
+            ) {
+                val compassRadius = (size.minDimension / 2) * 0.9f
+                val compassCenter = center
 
                 // Draw the compass background circle.
                 drawCircle(
-                    color = Color.Gray,
+                    color = Color.DarkGray,
                     radius = compassRadius,
                     center = compassCenter,
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f)
+                    style = Stroke(width = 4.dp.toPx())
                 )
 
                 // Draw the red "North" line, which rotates based on the device's heading.
@@ -165,14 +242,14 @@ fun PdrScreen(stepViewModel: StepViewModel, motionViewModel: MotionViewModel) {
                     compassCenter.x + compassRadius * kotlin.math.sin(-stepViewModel.heading),
                     compassCenter.y - compassRadius * kotlin.math.cos(-stepViewModel.heading)
                 )
-                drawLine(color = Color.Red, start = compassCenter, end = northEnd, strokeWidth = 4f)
-                
+                drawLine(color = Color.Red, start = compassCenter, end = northEnd, strokeWidth = 4.dp.toPx())
+
                 // Draw the blue arrow representing the user's current forward direction (always points up).
                 val headingEnd = Offset(
-                    compassCenter.x + compassRadius * kotlin.math.sin(0f),
-                    compassCenter.y - compassRadius * kotlin.math.cos(0f)
+                    compassCenter.x,
+                    compassCenter.y - compassRadius
                 )
-                drawLine(color = Color.Blue, start = compassCenter, end = headingEnd, strokeWidth = 6f)
+                drawLine(color = Color.Blue, start = compassCenter, end = headingEnd, strokeWidth = 5.dp.toPx())
             }
         }
     }
@@ -203,6 +280,16 @@ fun SettingsScreen(stepViewModel: StepViewModel) {
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             singleLine = true
         )
+
+        // --- UI Control ---
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Show Floor Plan")
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = stepViewModel.showFloorPlan,
+                onCheckedChange = { stepViewModel.showFloorPlan = it }
+            )
+        }
 
         // --- Stride Calculation Parameters ---
         Text("K (Frequency Factor): ${"%.2f".format(stepViewModel.kValue)}")

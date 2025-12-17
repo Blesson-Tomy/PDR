@@ -10,6 +10,7 @@ import com.example.pdr.sensor.HeadingDetector
 import com.example.pdr.sensor.StepDetector
 import com.example.pdr.ui.MainScreen
 import com.example.pdr.ui.theme.PDRTheme
+import com.example.pdr.viewmodel.FloorPlanViewModel
 import com.example.pdr.viewmodel.MotionViewModel
 import com.example.pdr.viewmodel.StepViewModel
 
@@ -27,6 +28,8 @@ class MainActivity : ComponentActivity() {
     private val stepViewModel: StepViewModel by viewModels()
     // The ViewModel for motion classification, accessed via the viewModels delegate.
     private val motionViewModel: MotionViewModel by viewModels()
+    // The ViewModel for the floor plan, accessed via the viewModels delegate.
+    private val floorPlanViewModel: FloorPlanViewModel by viewModels()
 
     // The custom class that handles step detection logic.
     private var stepDetector: StepDetector? = null
@@ -62,7 +65,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             PDRTheme {
                 // The MainScreen composable is the root of the UI, passing in the required ViewModels.
-                MainScreen(stepViewModel, motionViewModel)
+                MainScreen(stepViewModel, motionViewModel, floorPlanViewModel)
             }
         }
     }
