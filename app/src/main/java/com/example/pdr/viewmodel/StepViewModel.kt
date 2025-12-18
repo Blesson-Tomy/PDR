@@ -37,12 +37,6 @@ class StepViewModel : ViewModel() {
     // Intercept constant for the base stride-to-height ratio.
     var cValue by mutableFloatStateOf(0.15f)
 
-    // --- UI Control ---
-    // If true, the canvas will show the static floor plan. Otherwi se, it shows the live PDR path.
-    var showFloorPlan by mutableStateOf(true)
-    // When true, the next tap on the canvas will set a new origin point.
-    var isSettingOrigin by mutableStateOf(false)
-
     // The current heading of the device in radians, updated by the HeadingDetector.
     var heading by mutableFloatStateOf(0f)
 
@@ -112,13 +106,6 @@ class StepViewModel : ViewModel() {
     }
 
     /**
-     * Toggles the state for setting a new origin point on the map.
-     */
-    fun toggleIsSettingOrigin() {
-        isSettingOrigin = !isSettingOrigin
-    }
-
-    /**
      * Resets the PDR path to a new user-defined starting point.
      *
      * @param newOrigin The canvas coordinates for the new starting point.
@@ -128,6 +115,5 @@ class StepViewModel : ViewModel() {
         lastX = newOrigin.x
         lastY = newOrigin.y
         points.add(newOrigin) // Add the new origin as the first point
-        isSettingOrigin = false // Exit origin setting mode
     }
 }

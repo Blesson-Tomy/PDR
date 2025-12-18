@@ -1,6 +1,10 @@
 package com.example.pdr.viewmodel
 
 import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import com.example.pdr.model.Wall
 import com.google.gson.Gson
@@ -16,6 +20,13 @@ class FloorPlanViewModel(application: Application) : AndroidViewModel(applicatio
 
     // A list of all the walls that make up the floor plan.
     val walls: List<Wall>
+
+    // If true, the canvas will show the static floor plan. Otherwise, it shows the live PDR path.
+    var showFloorPlan by mutableStateOf(true)
+    // When true, the next tap on the canvas will set a new origin point.
+    var isSettingOrigin by mutableStateOf(false)
+    // A scaling factor to apply to the floor plan coordinates.
+    var floorPlanScale by mutableFloatStateOf(1f)
 
     init {
         // Load the floor plan from the JSON file in the assets folder at initialization.
@@ -42,5 +53,12 @@ class FloorPlanViewModel(application: Application) : AndroidViewModel(applicatio
             e.printStackTrace()
             emptyList()
         }
+    }
+
+    /**
+     * Toggles the state for setting a new origin point on the map.
+     */
+    fun toggleIsSettingOrigin() {
+        isSettingOrigin = !isSettingOrigin
     }
 }
