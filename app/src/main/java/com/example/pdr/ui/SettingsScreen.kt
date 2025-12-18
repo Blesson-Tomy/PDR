@@ -56,11 +56,12 @@ fun SettingsScreen(stepViewModel: StepViewModel, floorPlanViewModel: FloorPlanVi
             )
         }
 
-        Text("Floor Plan Scale: ${"%.2f".format(floorPlanViewModel.floorPlanScale)}")
-        Slider(
+        OutlinedTextField(
             value = floorPlanViewModel.floorPlanScale,
             onValueChange = { floorPlanViewModel.floorPlanScale = it },
-            valueRange = 0.1f..5f
+            label = { Text("Floor Plan Scale") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true
         )
 
         // --- Stride Calculation Parameters --

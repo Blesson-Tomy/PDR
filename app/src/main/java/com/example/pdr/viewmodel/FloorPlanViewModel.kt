@@ -2,7 +2,6 @@ package com.example.pdr.viewmodel
 
 import android.app.Application
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -26,7 +25,7 @@ class FloorPlanViewModel(application: Application) : AndroidViewModel(applicatio
     // When true, the next tap on the canvas will set a new origin point.
     var isSettingOrigin by mutableStateOf(false)
     // A scaling factor to apply to the floor plan coordinates.
-    var floorPlanScale by mutableFloatStateOf(1f)
+    var floorPlanScale by mutableStateOf("0.62")
 
     init {
         // Load the floor plan from the JSON file in the assets folder at initialization.

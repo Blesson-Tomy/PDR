@@ -32,10 +32,14 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import android.graphics.Paint
 import com.example.pdr.viewmodel.FloorPlanViewModel
 import com.example.pdr.viewmodel.MotionViewModel
 import com.example.pdr.viewmodel.StepViewModel
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 /**
  * The main PDR screen, which displays the user's path, motion data, and a compass.
@@ -54,7 +58,34 @@ fun PdrScreen(
     // Get the list of points to draw from the ViewModel.
     val points = stepViewModel.points
     val walls = floorPlanViewModel.walls
-    val floorPlanScale = floorPlanViewModel.floorPlanScale
+    val floorPlanScale = floorPlanViewModel.floorPlanScale.toFloatOrNull() ?: 1f
+
+    // Extract and label unique wall endpoints
+    val uniqueEndpoints = remember(walls, floorPlanScale) {
+        val endpoints = mutableSetOf<Pair<Float, Float>>()
+        walls.forEach { wall ->
+            endpoints.add(Pair(wall.x1 * floorPlanScale, wall.y1 * floorPlanScale))
+            endpoints.add(Pair(wall.x2 * floorPlanScale, wall.y2 * floorPlanScale))
+        }
+        endpoints.toList().sortedWith(compareBy({ it.first }, { it.second })).mapIndexed { index, point ->
+            val label = (index + 1).toString()
+            Triple(point.first, point.second, label)
+        }
+    }
+
+    // Calculate distance between points 26 and 52 in cm (1 unit = 2 cm)
+    val distanceBetweenPointsCm = remember(uniqueEndpoints) {
+        if (uniqueEndpoints.size >= 52) {
+            val point26 = uniqueEndpoints[25] // 0-indexed
+            val point52 = uniqueEndpoints[51] // 0-indexed
+            val dx = point52.first - point26.first
+            val dy = point52.second - point26.second
+            val distanceInUnits = sqrt(dx * dx + dy * dy)
+            distanceInUnits * 2 // Convert to cm (1 unit = 2 cm)
+        } else {
+            0f
+        }
+    }
 
 
     // Calculate the bounding box that contains all drawable content (walls and PDR points).
@@ -130,7 +161,7 @@ fun PdrScreen(
                             val effectiveRotationChange: Float
 
                             // Prioritize rotation only if the rotational change is significant compared to the zoom.
-                            if (abs(rotationChange) > abs(zoom - 1f) * 50) { // Heuristic to distinguish rotation from zoom
+                            if (abs(rotationChange) > abs(zoom - 1f) * 60) { // Heuristic to distinguish rotation from zoom
                                 effectiveRotationChange = rotationChange
                                 effectiveZoom = 1f
                             } else {
@@ -197,6 +228,28 @@ fun PdrScreen(
                             strokeWidth = 5f / scale // Keep stroke width consistent when zooming
                         )
                     }
+                    
+                    // Draw labels for unique wall endpoints
+                    drawIntoCanvas { canvas ->
+                        val paint = Paint().apply {
+                            color = android.graphics.Color.BLUE
+                            textSize = 40f / scale
+                            textAlign = Paint.Align.LEFT
+                            isAntiAlias = true
+                        }
+                        for ((x, y, label) in uniqueEndpoints) {
+                            canvas.nativeCanvas.drawText(label, x, y + 15f / scale, paint)
+                        }
+                    }
+                    
+                    // Draw circles at each endpoint
+                    for ((x, y, _) in uniqueEndpoints) {
+                        drawCircle(
+                            color = Color.Blue,
+                            radius = 6f / scale,
+                            center = Offset(x, y)
+                        )
+                    }
                 }
                 // Always draw the PDR path on top.
                 for (p in points) {
@@ -229,6 +282,12 @@ fun PdrScreen(
                 text = "Average Cadence: ${"%.2f".format(stepViewModel.averageCadence)} steps/sec",
                 style = MaterialTheme.typography.bodyMedium
             )
+            if (distanceBetweenPointsCm > 0f) {
+                Text(
+                    text = "Distance (26→52): ${"%.2f".format(distanceBetweenPointsCm)} cm",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
 
         // A separate, fixed canvas for the compass overlay.
