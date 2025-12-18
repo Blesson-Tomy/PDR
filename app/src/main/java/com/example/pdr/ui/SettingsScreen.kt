@@ -64,6 +64,14 @@ fun SettingsScreen(stepViewModel: StepViewModel, floorPlanViewModel: FloorPlanVi
             singleLine = true
         )
 
+        OutlinedTextField(
+            value = floorPlanViewModel.floorPlanRotation,
+            onValueChange = { floorPlanViewModel.floorPlanRotation = it },
+            label = { Text("Floor Plan Rotation (°)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true
+        )
+
         // --- Stride Calculation Parameters --
         Text("K (Frequency Factor): ${"%.2f".format(stepViewModel.kValue)}")
         Text("Controls how much stride length increases with speed.", style = MaterialTheme.typography.bodySmall)

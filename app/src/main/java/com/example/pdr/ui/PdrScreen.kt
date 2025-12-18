@@ -59,13 +59,30 @@ fun PdrScreen(
     val points = stepViewModel.points
     val walls = floorPlanViewModel.walls
     val floorPlanScale = floorPlanViewModel.floorPlanScale.toFloatOrNull() ?: 1f
+    val floorPlanRotationDegrees = floorPlanViewModel.floorPlanRotation.toFloatOrNull() ?: 0f
+
+    // Helper function to rotate a point around the origin by the given angle in degrees
+    val rotatePoint = { x: Float, y: Float, angleDegrees: Float ->
+        val angleRad = Math.toRadians(angleDegrees.toDouble()).toFloat()
+        val cos = kotlin.math.cos(angleRad)
+        val sin = kotlin.math.sin(angleRad)
+        val rotatedX = x * cos - y * sin
+        val rotatedY = x * sin + y * cos
+        Pair(rotatedX, rotatedY)
+    }
 
     // Extract and label unique wall endpoints
-    val uniqueEndpoints = remember(walls, floorPlanScale) {
+    val uniqueEndpoints = remember(walls, floorPlanScale, floorPlanRotationDegrees) {
         val endpoints = mutableSetOf<Pair<Float, Float>>()
         walls.forEach { wall ->
-            endpoints.add(Pair(wall.x1 * floorPlanScale, wall.y1 * floorPlanScale))
-            endpoints.add(Pair(wall.x2 * floorPlanScale, wall.y2 * floorPlanScale))
+            val x1 = wall.x1 * floorPlanScale
+            val y1 = wall.y1 * floorPlanScale
+            val x2 = wall.x2 * floorPlanScale
+            val y2 = wall.y2 * floorPlanScale
+            val rotated1 = rotatePoint(x1, y1, floorPlanRotationDegrees)
+            val rotated2 = rotatePoint(x2, y2, floorPlanRotationDegrees)
+            endpoints.add(rotated1)
+            endpoints.add(rotated2)
         }
         endpoints.toList().sortedWith(compareBy({ it.first }, { it.second })).mapIndexed { index, point ->
             val label = (index + 1).toString()
@@ -88,8 +105,8 @@ fun PdrScreen(
     }
 
 
-    // Calculate the bounding box that contains all drawable content (walls and PDR points).
-    val contentBounds = remember(walls, points, floorPlanScale) {
+    // Calculate the bounding box that contains all drawable content (walls and PDR points) after rotation and scaling.
+    val contentBounds = remember(walls, points, floorPlanScale, floorPlanRotationDegrees) {
         if (walls.isEmpty() && points.isEmpty()) {
             // If there's nothing to draw, provide a default 1000x1000 area.
             return@remember Rect(-500f, -500f, 500f, 500f)
@@ -100,11 +117,21 @@ fun PdrScreen(
         var maxX = Float.NEGATIVE_INFINITY
         var maxY = Float.NEGATIVE_INFINITY
 
+        // Calculate bounds for rotated and scaled walls
         walls.forEach { wall ->
-            minX = minOf(minX, wall.x1 * floorPlanScale, wall.x2 * floorPlanScale)
-            minY = minOf(minY, wall.y1 * floorPlanScale, wall.y2 * floorPlanScale)
-            maxX = maxOf(maxX, wall.x1 * floorPlanScale, wall.x2 * floorPlanScale)
-            maxY = maxOf(maxY, wall.y1 * floorPlanScale, wall.y2 * floorPlanScale)
+            val x1 = wall.x1 * floorPlanScale
+            val y1 = wall.y1 * floorPlanScale
+            val x2 = wall.x2 * floorPlanScale
+            val y2 = wall.y2 * floorPlanScale
+            
+            // Apply rotation
+            val rotated1 = rotatePoint(x1, y1, floorPlanRotationDegrees)
+            val rotated2 = rotatePoint(x2, y2, floorPlanRotationDegrees)
+            
+            minX = minOf(minX, rotated1.first, rotated2.first)
+            minY = minOf(minY, rotated1.second, rotated2.second)
+            maxX = maxOf(maxX, rotated1.first, rotated2.first)
+            maxY = maxOf(maxY, rotated1.second, rotated2.second)
         }
 
         points.forEach { p ->
@@ -221,10 +248,22 @@ fun PdrScreen(
                 if (floorPlanViewModel.showFloorPlan) {
                     // Draw the floor plan.
                     for (wall in walls) {
+                        val x1 = wall.x1 * floorPlanScale
+                        val y1 = wall.y1 * floorPlanScale
+                        val x2 = wall.x2 * floorPlanScale
+                        val y2 = wall.y2 * floorPlanScale
+                        // Apply rotation
+                        val angleRad = Math.toRadians(floorPlanRotationDegrees.toDouble()).toFloat()
+                        val cos = kotlin.math.cos(angleRad)
+                        val sin = kotlin.math.sin(angleRad)
+                        val rotatedX1 = x1 * cos - y1 * sin
+                        val rotatedY1 = x1 * sin + y1 * cos
+                        val rotatedX2 = x2 * cos - y2 * sin
+                        val rotatedY2 = x2 * sin + y2 * cos
                         drawLine(
                             color = Color.Black,
-                            start = Offset(wall.x1 * floorPlanScale, wall.y1 * floorPlanScale),
-                            end = Offset(wall.x2 * floorPlanScale, wall.y2 * floorPlanScale),
+                            start = Offset(rotatedX1, rotatedY1),
+                            end = Offset(rotatedX2, rotatedY2),
                             strokeWidth = 5f / scale // Keep stroke width consistent when zooming
                         )
                     }

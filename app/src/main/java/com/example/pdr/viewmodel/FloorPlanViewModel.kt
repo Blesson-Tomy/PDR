@@ -26,6 +26,8 @@ class FloorPlanViewModel(application: Application) : AndroidViewModel(applicatio
     var isSettingOrigin by mutableStateOf(false)
     // A scaling factor to apply to the floor plan coordinates.
     var floorPlanScale by mutableStateOf("0.62")
+    // A rotation angle in degrees to apply to the floor plan.
+    var floorPlanRotation by mutableStateOf("0.00")
 
     init {
         // Load the floor plan from the JSON file in the assets folder at initialization.
