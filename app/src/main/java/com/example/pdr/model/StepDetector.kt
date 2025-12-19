@@ -1,11 +1,9 @@
-package com.example.pdr.sensor
+package com.example.pdr.model
 
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import com.example.pdr.viewmodel.MotionViewModel
-import com.example.pdr.viewmodel.StepViewModel
 import kotlin.math.sqrt
 
 /**
@@ -15,14 +13,19 @@ import kotlin.math.sqrt
  * magnitude data. It uses a frequency-based model to estimate stride length, which is more robust
  * than amplitude-based models against filtering and sensor orientation issues.
  *
+ * This is now a pure model class with NO dependencies on ViewModels.
+ * Results are reported via callbacks to be used by repositories/view models.
+ *
  * @param sensorManager The system's sensor manager to access the accelerometer.
- * @param stepViewModel The ViewModel to which new steps (with their calculated stride length) are reported.
- * @param motionViewModel The ViewModel used for motion type classification (e.g., walking, running).
+ * @param userHeightCm The user's height in centimeters.
+ * @param kValue Stride calculation coefficient.
+ * @param cValue Stride calculation intercept.
  */
 class StepDetector(
     private val sensorManager: SensorManager,
-    private val stepViewModel: StepViewModel,
-    private val motionViewModel: MotionViewModel
+    private val userHeightCm: Float,
+    private val kValue: Float,
+    private val cValue: Float
 ) : SensorEventListener {
 
     // Timestamp of the last detected step in milliseconds. Used for debouncing and cadence calculation.
@@ -35,6 +38,15 @@ class StepDetector(
     private var currentStepMinAcc = 0f
     // A sliding window of recent accelerometer magnitude readings to smooth out the data.
     private val magnitudeWindow = mutableListOf<Float>()
+
+    // Configuration parameters
+    var threshold = 12f
+    var windowSize = 6
+    var debounce = 300L
+
+    // Callbacks instead of ViewModel references
+    var onStepDetected: ((strideLengthCm: Float, stepFrequency: Float) -> Unit)? = null
+    var onSensorDataReceived: ((accX: Float, accY: Float, accZ: Float) -> Unit)? = null
 
     /**
      * Registers the listener for the accelerometer to start detecting steps.
@@ -63,15 +75,15 @@ class StepDetector(
             val accY = event.values[1]
             val accZ = event.values[2]
 
-            // Pass raw sensor data to the MotionViewModel for activity classification.
-            motionViewModel.onSensorDataReceived(accX, accY, accZ)
+            // Notify about raw sensor data (for motion classification)
+            onSensorDataReceived?.invoke(accX, accY, accZ)
 
             // Calculate the magnitude of the acceleration vector.
             val magnitude = sqrt(accX * accX + accY * accY + accZ * accZ)
             // Add the new magnitude to our sliding window.
             magnitudeWindow.add(magnitude)
             // Ensure the window does not exceed its defined size.
-            if (magnitudeWindow.size > stepViewModel.windowSize.toInt()) {
+            if (magnitudeWindow.size > windowSize) {
                 magnitudeWindow.removeAt(0)
             }
             // Use the average of the window for a smoother, less noisy signal.
@@ -80,12 +92,12 @@ class StepDetector(
             // This state machine identifies the pattern of a step: a rise then a fall in acceleration.
             when (stepState) {
                 // The "IDLE" state is when the system is waiting for a potential step to begin.
-                "IDLE" -> if (avgMagnitude > stepViewModel.threshold) {
+                "IDLE" -> if (avgMagnitude > threshold) {
                     // A significant rise in acceleration suggests a step has started.
                     stepState = "RISING"
                     // Initialize the max and min acceleration for this new potential step.
                     currentStepMaxAcc = avgMagnitude
-                    currentStepMinAcc = avgMagnitude // Reset min at the start of a potential step
+                    currentStepMinAcc = avgMagnitude
                 }
                 // The "RISING" state is when acceleration is increasing towards a peak.
                 "RISING" -> if (avgMagnitude > currentStepMaxAcc) {
@@ -99,14 +111,14 @@ class StepDetector(
                 "FALLING" -> if (avgMagnitude < currentStepMinAcc) {
                     // We've found a new valley in acceleration.
                     currentStepMinAcc = avgMagnitude
-                } else if (avgMagnitude > stepViewModel.threshold) {
+                } else if (avgMagnitude > threshold) {
                     // Acceleration has risen again, indicating the step cycle is complete.
                     // Debounce to prevent multiple detections for a single physical step.
-                    if (now - lastStepTime > stepViewModel.debounce.toLong()) {
+                    if (now - lastStepTime > debounce) {
                         // Calculate stride length and cadence.
                         val (strideLength, stepFrequency) = calculateStrideAndCadence(now)
-                        // Report the new step, its stride length, and its cadence to the ViewModel.
-                        stepViewModel.addStep(strideLength, stepFrequency)
+                        // Report the new step via callback (no ViewModel reference)
+                        onStepDetected?.invoke(strideLength, stepFrequency)
                         lastStepTime = now
                     }
                     // Reset the state machine to wait for the next step.
@@ -129,14 +141,10 @@ class StepDetector(
         val timeDiffSeconds = ((currentTime - lastStepTime) / 1000f).coerceAtLeast(0.2f)
         val stepFrequency = 1f / timeDiffSeconds
 
-        // 2. Get User Height (in cm) from the ViewModel.
-        val userHeightCm = stepViewModel.height.toFloatOrNull() ?: 175f
-
-        // 3. Algorithm: A linear model relating stride length to step frequency and height.
+        // 2. Algorithm: A linear model relating stride length to step frequency and height.
         // The formula is: StrideLength = Height * (K * Frequency + C)
-        // K and C are now sourced from the StepViewModel to be tunable from the UI.
-        val K = stepViewModel.kValue
-        val C = stepViewModel.cValue
+        val K = kValue
+        val C = cValue
 
         // The relationship is not purely linear; running has a different gait. We use a larger
         // coefficient if the frequency suggests the user is running (e.g., > 2.0 steps/sec).
@@ -145,7 +153,7 @@ class StepDetector(
         // Calculate the final stride length in centimeters.
         val calculatedStrideCm = userHeightCm * (dynamicK * stepFrequency + C)
 
-        // 4. Sanity Check / Clamping
+        // 3. Sanity Check / Clamping
         // Clamp the result to a realistic range based on the user's height to filter out anomalies.
         val minStride = userHeightCm * 0.2f // A very small step
         val maxStride = userHeightCm * 1.2f // A very large leap

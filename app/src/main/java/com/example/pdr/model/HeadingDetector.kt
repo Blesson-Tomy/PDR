@@ -1,17 +1,23 @@
-package com.example.pdr.sensor
+package com.example.pdr.model
 
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 
+/**
+ * Detects the device's heading (compass direction) using the rotation vector sensor.
+ * Reports heading via callback instead of LiveData.
+ * Pure model class with no UI dependencies.
+ */
 class HeadingDetector(private val sensorManager: SensorManager) : SensorEventListener {
 
-    private val _heading = MutableLiveData(0f)   // radians
-    val heading: LiveData<Float> get() = _heading
+    // Callback for heading updates (in radians)
+    var onHeadingChanged: ((heading: Float) -> Unit)? = null
 
+    /**
+     * Starts listening for rotation vector sensor events.
+     */
     fun start() {
         val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
         rotationSensor?.let {
@@ -19,10 +25,16 @@ class HeadingDetector(private val sensorManager: SensorManager) : SensorEventLis
         }
     }
 
+    /**
+     * Stops listening for rotation vector sensor events.
+     */
     fun stop() {
         sensorManager.unregisterListener(this)
     }
 
+    /**
+     * Called when rotation vector data is available. Calculates and reports the heading.
+     */
     override fun onSensorChanged(event: SensorEvent) {
         val rotationMatrix = FloatArray(9)
         SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
@@ -30,7 +42,8 @@ class HeadingDetector(private val sensorManager: SensorManager) : SensorEventLis
         val orientationAngles = FloatArray(3)
         SensorManager.getOrientation(rotationMatrix, orientationAngles)
 
-        _heading.postValue(orientationAngles[0]) // azimuth in radians
+        // Report heading (azimuth in radians) via callback
+        onHeadingChanged?.invoke(orientationAngles[0])
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
