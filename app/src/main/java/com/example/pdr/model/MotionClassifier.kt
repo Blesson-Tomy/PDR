@@ -43,9 +43,9 @@ class MotionClassifier(
      * @return A FloatArray of probabilities for each class.
      */
     fun predict(data: Array<FloatArray>): FloatArray {
-        // 1. Create the input ByteBuffer (updated for 4 features)
+        // 1. Create the input ByteBuffer (4 features: acc_x, acc_y, acc_z, acc_mag)
         val numFeatures = 4
-        val inputBuffer = ByteBuffer.allocateDirect(1 * meta.windowSize * numFeatures * 4) // 1 batch, 100 window, 4 features, 4 bytes/float
+        val inputBuffer = ByteBuffer.allocateDirect(1 * meta.windowSize * numFeatures * 4) // 1 batch, 128 window, 4 features, 4 bytes/float
         inputBuffer.order(ByteOrder.nativeOrder())
 
         // 2. Normalize and fill the ByteBuffer (updated for 4 features)

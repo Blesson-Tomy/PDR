@@ -7,9 +7,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.core.view.WindowCompat
 import com.example.pdr.model.StepDetector
 import com.example.pdr.model.HeadingDetector
+import com.example.pdr.model.MotionType
 import com.example.pdr.repository.PdrRepository
 import com.example.pdr.repository.MotionRepository
 import com.example.pdr.repository.FloorPlanRepository
@@ -22,20 +24,23 @@ import com.example.pdr.viewmodel.StepViewModel
 /**
  * The main entry point of the application.
  *
- * This Activity is responsible for setting up the application's UI, initializing repositories and sensor detectors,
- * and connecting them via callbacks.
+ * STATEFLOW ARCHITECTURE:
+ * 1. Repositories emit events/state via StateFlows
+ * 2. ViewModels collect from StateFlows and expose Compose state
+ * 3. MainActivity wires everything together during initialization
+ * 4. Composables read ViewModel state (no need to know about repositories)
  */
 class MainActivity : ComponentActivity() {
 
     // The system service that provides access to the device's sensors.
     private lateinit var sensorManager: SensorManager
     
-    // ViewModels (now pure UI state holders)
+    // ViewModels (now pure UI state holders + StateFlow collectors)
     private val stepViewModel: StepViewModel by viewModels()
     private val motionViewModel: MotionViewModel by viewModels()
     private val floorPlanViewModel: FloorPlanViewModel by viewModels()
 
-    // Repositories (business logic layer)
+    // Repositories (business logic layer - emit via StateFlows)
     private lateinit var pdrRepository: PdrRepository
     private lateinit var motionRepository: MotionRepository
     private lateinit var floorPlanRepository: FloorPlanRepository
@@ -55,10 +60,10 @@ class MainActivity : ComponentActivity() {
         // Get an instance of the SensorManager.
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
 
-        // Initialize repositories
+        // Initialize repositories (these emit StateFlows)
         initializeRepositories()
         
-        // Initialize sensor detectors and connect them to repositories
+        // Initialize sensor detectors and wire to repositories
         initializeSensorDetectors()
 
         // Set the main UI content of the activity.
@@ -66,6 +71,9 @@ class MainActivity : ComponentActivity() {
             PDRTheme {
                 // Observe ViewModel changes and sync with detectors
                 ObserveSettingsChanges()
+                
+                // NEW: Observe motion events for floor transitions
+                ObserveMotionEvents()
                 
                 // The MainScreen composable is the root of the UI, passing in the required ViewModels.
                 MainScreen(stepViewModel, motionViewModel, floorPlanViewModel)
@@ -84,6 +92,39 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
+     * STATEFLOW IN ACTION:
+     * Observes motion events from the repository and handles floor transitions.
+     * 
+     * This replaces the old callback spaghetti. Now:
+     * - MotionRepository emits MotionEvent to motionEvents StateFlow
+     * - This composable collects the StateFlow
+     * - When stair is detected, we handle the floor transition
+     * - When floor changes, other parts of the app react via their own flows
+     */
+    @Composable
+    private fun ObserveMotionEvents() {
+        val motionEvent = motionRepository.motionEvents.collectAsState()
+        
+        LaunchedEffect(motionEvent.value) {
+            motionEvent.value?.let { event ->
+                when (event.motionType) {
+                    MotionType.STAIR_ASCENT -> {
+                        // User is going up
+                        // TODO: Implement floor change logic
+                    }
+                    MotionType.STAIR_DESCENT -> {
+                        // User is going down
+                        // TODO: Implement floor change logic
+                    }
+                    else -> {
+                        // Walking, stationary, etc.
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Syncs all detector settings from ViewModel values.
      * Called whenever settings change in the UI.
      */
@@ -94,7 +135,13 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Initializes all repositories and sets up their callbacks to update ViewModels.
+     * Initializes all repositories and sets up their StateFlow emission.
+     * 
+     * WIRING:
+     * - Repositories create and hold StateFlows
+     * - ViewModels get injected with repository references
+     * - ViewModels use viewModelScope to collect from StateFlows
+     * - UI never directly accesses repositories (only ViewModels)
      */
     private fun initializeRepositories() {
         // Floor Plan Repository - loads wall data from assets
@@ -104,22 +151,26 @@ class MainActivity : ComponentActivity() {
 
         // PDR Repository - handles path calculation
         pdrRepository = PdrRepository()
-        pdrRepository.onStepDetected = { strideLengthCm, cadence, newPoint ->
-            stepViewModel.onStepDetected(strideLengthCm, cadence, newPoint)
-        }
-        pdrRepository.onCadenceUpdated = { averageCadence ->
-            stepViewModel.onCadenceUpdated(averageCadence)
-        }
+        // Inject repository reference into ViewModel
+        // ViewModel will automatically start collecting from repository's StateFlows
+        stepViewModel.pdrRepository = pdrRepository
 
         // Motion Repository - handles ML classification
         motionRepository = MotionRepository(application)
-        motionRepository.onMotionDetected = { motionType, confidence ->
-            motionViewModel.onMotionDetected(motionType, confidence)
-        }
+        // Inject repository reference into ViewModel
+        motionViewModel.motionRepository = motionRepository
     }
 
     /**
      * Initializes sensor detectors and starts listening for sensor events.
+     * 
+     * DATA FLOW:
+     * StepDetector (sensor) 
+     *   → PdrRepository (process step, emit to StateFlow)
+     *   → StepViewModel (collect and display)
+     *   → PdrScreen (read ViewModel state)
+     * 
+     * No callbacks needed - StateFlows handle everything!
      */
     private fun initializeSensorDetectors() {
         // Initialize and start step detector
