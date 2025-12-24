@@ -269,6 +269,7 @@ fun PdrScreen(
                     }
                     
                     // Draw labels for unique wall endpoints
+                    // Labels stay with their positions (pan/zoom) but text doesn't rotate
                     drawIntoCanvas { canvas ->
                         val paint = Paint().apply {
                             color = android.graphics.Color.BLUE
@@ -276,8 +277,23 @@ fun PdrScreen(
                             textAlign = Paint.Align.LEFT
                             isAntiAlias = true
                         }
+                        
                         for ((x, y, label) in uniqueEndpoints) {
-                            canvas.nativeCanvas.drawText(label, x, y + 15f / scale, paint)
+                            // Save canvas state before transformation
+                            canvas.nativeCanvas.save()
+                            
+                            // Translate to label position
+                            canvas.nativeCanvas.translate(x, y + 15f / scale)
+                            
+                            // Counter-rotate the text by the global canvas rotation
+                            // This keeps text upright while position rotates with map
+                            canvas.nativeCanvas.rotate(-rotation)
+                            
+                            // Draw text at origin (now rotated back to upright)
+                            canvas.nativeCanvas.drawText(label, 0f, 0f, paint)
+                            
+                            // Restore canvas state
+                            canvas.nativeCanvas.restore()
                         }
                     }
                     
