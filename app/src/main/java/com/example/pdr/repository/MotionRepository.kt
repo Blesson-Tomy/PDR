@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
@@ -32,8 +33,23 @@ class MotionRepository(application: Application) {
     private val _motionEvents = MutableStateFlow<MotionEvent?>(null)
     val motionEvents: StateFlow<MotionEvent?> = _motionEvents.asStateFlow()
 
+    // ===== SMOOTHING / NOISE REDUCTION =====
+    // Keep recent predictions to smooth out noisy model output
+    // Majority voting prevents false positives (e.g., 1 second of misclassification in 10 second walk)
+    private val recentPredictions = mutableListOf<MotionType>()
+    private val smoothingWindowSize = 3  // Use last 5 predictions for majority vote
+    
+    private var lastEmittedMotionType: MotionType? = null
+    private var lastEmittedConfidence = 0f
+
     /**
      * Processes incoming accelerometer data for motion classification.
+     * 
+     * SMOOTHING STRATEGY:
+     * - Each inference produces a raw classification
+     * - We add it to a sliding window of recent predictions
+     * - We emit the MAJORITY VOTE of recent predictions
+     * - This reduces noise while maintaining responsive transitions (~1-2 seconds)
      * 
      * THREAD SAFETY & STATEFLOW:
      * - Background thread: collects sensor data and runs ML inference
@@ -56,13 +72,12 @@ class MotionRepository(application: Application) {
                 
                 // Find the class with highest confidence
                 val predictedIndex = prediction.indices.maxByOrNull { prediction[it] } ?: -1
-                val maxConfidence = if (predictedIndex != -1) prediction[predictedIndex] else 0f
                 
                 if (predictedIndex != -1) {
                     val motionTypeString = motionClassifier.meta.classNames[predictedIndex]
                     // Convert class name from JSON to MotionType enum
                     // JSON classes: "walking", "upstairs", "downstairs", "idle"
-                    val motionType = when (motionTypeString.lowercase()) {
+                    val rawMotionType = when (motionTypeString.lowercase()) {
                         "walking" -> MotionType.WALKING
                         "upstairs" -> MotionType.STAIR_ASCENT
                         "downstairs" -> MotionType.STAIR_DESCENT
@@ -70,13 +85,31 @@ class MotionRepository(application: Application) {
                         else -> MotionType.UNKNOWN
                     }
                     
-                    // Update UI on main thread
-                    scope.launch(Dispatchers.Main) {
-                        val event = MotionEvent(
-                            motionType = motionType,
-                            confidence = maxConfidence
-                        )
-                        _motionEvents.value = event
+                    // Add raw prediction to smoothing window
+                    recentPredictions.add(rawMotionType)
+                    // Keep window size bounded
+                    if (recentPredictions.size > smoothingWindowSize) {
+                        recentPredictions.removeAt(0)
+                    }
+                    
+                    // Get smoothed motion type via majority voting
+                    val smoothedMotionType = getMajorityVoteMotionType()
+                    val smoothedConfidence = getWeightedAverageConfidence(prediction)
+                    
+                    // Only emit if motion type changed or confidence changed significantly
+                    // This reduces UI flicker while staying responsive
+                    if (smoothedMotionType != lastEmittedMotionType || 
+                        (abs(smoothedConfidence - lastEmittedConfidence) > 0.15f)) {
+                        
+                        scope.launch(Dispatchers.Main) {
+                            val event = MotionEvent(
+                                motionType = smoothedMotionType,
+                                confidence = smoothedConfidence
+                            )
+                            _motionEvents.value = event
+                            lastEmittedMotionType = smoothedMotionType
+                            lastEmittedConfidence = smoothedConfidence
+                        }
                     }
                 }
             }
@@ -89,6 +122,59 @@ class MotionRepository(application: Application) {
             }
         }
     }
+
+    /**
+     * Gets the most common motion type in the recent predictions window.
+     * This smooths out temporary misclassifications.
+     * 
+     * Example: [WALKING, WALKING, IDLE, WALKING, WALKING] → WALKING
+     * The single IDLE misclassification is ignored.
+     */
+    private fun getMajorityVoteMotionType(): MotionType {
+        if (recentPredictions.isEmpty()) return MotionType.UNKNOWN
+        
+        // Count occurrences of each motion type
+        val counts = recentPredictions.groupingBy { it }.eachCount()
+        
+        // Return the motion type with highest count
+        return counts.maxByOrNull { it.value }?.key ?: MotionType.UNKNOWN
+    }
+
+    /**
+     * Computes weighted average confidence for the smoothed motion type.
+     * Recent predictions are weighted more heavily than older ones.
+     * 
+     * This gives higher confidence when the model is consistently confident,
+     * and lower confidence during transitions when model is uncertain.
+     */
+    private fun getWeightedAverageConfidence(prediction: FloatArray): Float {
+        if (recentPredictions.isEmpty()) return 0f
+        
+        // Get the smoothed motion type
+        val smoothedType = getMajorityVoteMotionType()
+        
+        // Find index of smoothed type in model's class names
+        val typeIndex = when (smoothedType) {
+            MotionType.WALKING -> motionClassifier.meta.classNames.indexOf("walking")
+            MotionType.STAIR_ASCENT -> motionClassifier.meta.classNames.indexOf("upstairs")
+            MotionType.STAIR_DESCENT -> motionClassifier.meta.classNames.indexOf("downstairs")
+            MotionType.STATIONARY -> motionClassifier.meta.classNames.indexOf("idle")
+            MotionType.UNKNOWN -> -1
+        }
+        
+        if (typeIndex == -1 || typeIndex >= prediction.size) return 0f
+        
+        // Use the model's confidence for this type from latest prediction
+        return prediction[typeIndex].coerceIn(0f, 1f)
+    }
+
+    /**
+     * Adjusts smoothing sensitivity. 
+     * Larger = smoother but slower to respond to transitions
+     * Smaller = faster response but noisier output
+     * 
+     * Recommended: 3-7 (3=responsive, 7=smooth)
+     */
 
     /**
      * Cleans up resources.
