@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    //id("com.android.application")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -41,6 +43,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.7.0"))
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.tensorflow.lite)
     implementation(libs.androidx.compose.material.icons.extended)
