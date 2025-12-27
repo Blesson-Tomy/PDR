@@ -61,6 +61,7 @@ fun PdrScreen(
     val points = stepViewModel.points
     val walls = floorPlanViewModel.walls
     val stairwells = floorPlanViewModel.stairwells
+    val entrances = floorPlanViewModel.entrances
     val floorPlanScale = floorPlanViewModel.floorPlanScale.toFloatOrNull() ?: 1f
     val floorPlanRotationDegrees = floorPlanViewModel.floorPlanRotation.toFloatOrNull() ?: 0f
 
@@ -306,30 +307,32 @@ fun PdrScreen(
                     
                     // Draw labels for unique wall endpoints
                     // Labels stay with their positions (pan/zoom) but text doesn't rotate
-                    drawIntoCanvas { canvas ->
-                        val paint = Paint().apply {
-                            color = android.graphics.Color.BLUE
-                            textSize = 40f / scale
-                            textAlign = Paint.Align.LEFT
-                            isAntiAlias = true
-                        }
-                        
-                        for ((x, y, label) in uniqueEndpoints) {
-                            // Save canvas state before transformation
-                            canvas.nativeCanvas.save()
+                    if (floorPlanViewModel.showPointNumbers) {
+                        drawIntoCanvas { canvas ->
+                            val paint = Paint().apply {
+                                color = android.graphics.Color.BLUE
+                                textSize = 40f / scale
+                                textAlign = Paint.Align.LEFT
+                                isAntiAlias = true
+                            }
                             
-                            // Translate to label position
-                            canvas.nativeCanvas.translate(x, y + 15f / scale)
-                            
-                            // Counter-rotate the text by the global canvas rotation
-                            // This keeps text upright while position rotates with map
-                            canvas.nativeCanvas.rotate(-rotation)
-                            
-                            // Draw text at origin (now rotated back to upright)
-                            canvas.nativeCanvas.drawText(label, 0f, 0f, paint)
-                            
-                            // Restore canvas state
-                            canvas.nativeCanvas.restore()
+                            for ((x, y, label) in uniqueEndpoints) {
+                                // Save canvas state before transformation
+                                canvas.nativeCanvas.save()
+                                
+                                // Translate to label position
+                                canvas.nativeCanvas.translate(x, y + 15f / scale)
+                                
+                                // Counter-rotate the text by the global canvas rotation
+                                // This keeps text upright while position rotates with map
+                                canvas.nativeCanvas.rotate(-rotation)
+                                
+                                // Draw text at origin (now rotated back to upright)
+                                canvas.nativeCanvas.drawText(label, 0f, 0f, paint)
+                                
+                                // Restore canvas state
+                                canvas.nativeCanvas.restore()
+                            }
                         }
                     }
                     
@@ -342,6 +345,68 @@ fun PdrScreen(
                         )
                     }
                 }
+                
+                // Draw entrance points (yellow for normal, green for stairwells)
+                if (floorPlanViewModel.showEntrances) {
+                    for (entrance in entrances) {
+                        val x = entrance.x * floorPlanScale
+                        val y = entrance.y * floorPlanScale
+                        // Apply rotation
+                        val angleRad = Math.toRadians(floorPlanRotationDegrees.toDouble()).toFloat()
+                        val cos = kotlin.math.cos(angleRad)
+                        val sin = kotlin.math.sin(angleRad)
+                        val rotatedX = x * cos - y * sin
+                        val rotatedY = x * sin + y * cos
+                        
+                        // Choose color based on whether it's a stairwell or normal entrance
+                        val entranceColor = if (entrance.stairs) Color(0xFF00FF00) else Color(0xFFFFFF00) // Green or Yellow
+                        
+                        drawCircle(
+                            color = entranceColor,
+                            radius = 8f / scale,
+                            center = Offset(rotatedX, rotatedY)
+                        )
+                    }
+                    
+                    // Draw entrance labels (ID numbers) with no rotation
+                    drawIntoCanvas { canvas ->
+                        val paint = Paint().apply {
+                            color = android.graphics.Color.BLACK
+                            textSize = 32f / scale
+                            textAlign = Paint.Align.CENTER
+                            isAntiAlias = true
+                            isFakeBoldText = true
+                        }
+                        
+                        for (entrance in entrances) {
+                            val x = entrance.x * floorPlanScale
+                            val y = entrance.y * floorPlanScale
+                            // Apply rotation
+                            val angleRad = Math.toRadians(floorPlanRotationDegrees.toDouble()).toFloat()
+                            val cos = kotlin.math.cos(angleRad)
+                            val sin = kotlin.math.sin(angleRad)
+                            val rotatedX = x * cos - y * sin
+                            val rotatedY = x * sin + y * cos
+                            
+                            // Save canvas state before transformation
+                            canvas.nativeCanvas.save()
+                            
+                            // Translate to entrance position
+                            canvas.nativeCanvas.translate(rotatedX, rotatedY - 8f / scale)
+                            
+                            // Counter-rotate the text by the global canvas rotation
+                            // This keeps text upright while position rotates with map
+                            canvas.nativeCanvas.rotate(-rotation)
+                            
+                            // Draw entrance ID at origin (now rotated back to upright)
+                            canvas.nativeCanvas.drawText(entrance.id.toString(), 0f, 0f, paint)
+                            
+                            // Restore canvas state
+                            canvas.nativeCanvas.restore()
+                        }
+                    }
+                }
+                
                 // Always draw the PDR path on top.
                 for (p in points) {
                     drawCircle(color = Color.Red, radius = 10f / scale, center = p)

@@ -56,6 +56,24 @@ fun SettingsScreen(stepViewModel: StepViewModel, floorPlanViewModel: FloorPlanVi
             )
         }
 
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Show Point Numbers")
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = floorPlanViewModel.showPointNumbers,
+                onCheckedChange = { floorPlanViewModel.showPointNumbers = it }
+            )
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Show Entrances")
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = floorPlanViewModel.showEntrances,
+                onCheckedChange = { floorPlanViewModel.showEntrances = it }
+            )
+        }
+
         OutlinedTextField(
             value = floorPlanViewModel.floorPlanScale,
             onValueChange = { floorPlanViewModel.floorPlanScale = it },

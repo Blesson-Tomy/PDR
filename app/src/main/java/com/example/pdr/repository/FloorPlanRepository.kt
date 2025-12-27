@@ -4,7 +4,9 @@ import android.app.Application
 import com.example.pdr.model.Wall
 import com.example.pdr.model.StairLine
 import com.example.pdr.model.Stairwell
+import com.example.pdr.model.Entrance
 import com.google.gson.Gson
+import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
 import java.io.InputStreamReader
 
@@ -127,5 +129,30 @@ class FloorPlanRepository(private val application: Application) {
         } while (currentPoint != startPoint && orderedPoints.size < edges.size * 2)
         
         return orderedPoints
+    }
+
+    /**
+     * Loads the entrance points from the JSON file in the assets folder.
+     * Entrances can be regular room openings or stairwell entry/exits.
+     * Stairwell entry/exits are marked with "stairs": true.
+     *
+     * @param fileName The name of the entrance JSON file (default: "first_floor_entrances.json")
+     * @return A list of Entrance objects.
+     */
+    fun loadEntrances(fileName: String = "first_floor_entrances.json"): List<Entrance> {
+        return try {
+            val inputStream = application.assets.open(fileName)
+            val reader = InputStreamReader(inputStream)
+
+            // Parse the JSON object which contains an "entrances" array
+            val jsonObject = Gson().fromJson(reader, JsonObject::class.java)
+            val entrancesArray = jsonObject.getAsJsonArray("entrances")
+
+            val entranceListType = object : TypeToken<List<Entrance>>() {}.type
+            Gson().fromJson(entrancesArray, entranceListType)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
     }
 }
