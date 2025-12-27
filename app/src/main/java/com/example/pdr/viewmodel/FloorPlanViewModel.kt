@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.example.pdr.model.Wall
+import com.example.pdr.model.Stairwell
 
 /**
  * Manages UI state for the floor plan.
@@ -15,6 +16,7 @@ class FloorPlanViewModel : ViewModel() {
 
     // Floor plan data (loaded by repository)
     val walls = mutableStateListOf<Wall>()
+    val stairwells = mutableStateListOf<Stairwell>()
 
     // UI state for floor plan display
     var showFloorPlan by mutableStateOf(true)
@@ -28,6 +30,14 @@ class FloorPlanViewModel : ViewModel() {
     fun loadWalls(wallsList: List<Wall>) {
         walls.clear()
         walls.addAll(wallsList)
+    }
+
+    /**
+     * Loads stairwell polygons from repository.
+     */
+    fun loadStairwells(stairwellsList: List<Stairwell>) {
+        stairwells.clear()
+        stairwells.addAll(stairwellsList)
     }
 
     /**

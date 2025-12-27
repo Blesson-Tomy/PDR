@@ -26,7 +26,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
@@ -58,6 +60,7 @@ fun PdrScreen(
     // Get the list of points to draw from the ViewModel.
     val points = stepViewModel.points
     val walls = floorPlanViewModel.walls
+    val stairwells = floorPlanViewModel.stairwells
     val floorPlanScale = floorPlanViewModel.floorPlanScale.toFloatOrNull() ?: 1f
     val floorPlanRotationDegrees = floorPlanViewModel.floorPlanRotation.toFloatOrNull() ?: 0f
 
@@ -246,7 +249,40 @@ fun PdrScreen(
                 )
 
                 if (floorPlanViewModel.showFloorPlan) {
-                    // Draw the floor plan.
+                    // IMPORTANT: Draw stairwell polygons FIRST (filled) so they appear behind walls
+                    for (stairwell in stairwells) {
+                        if (stairwell.points.size >= 2) {
+                            // Transform and scale stairwell points
+                            val transformedPoints = stairwell.points.map { (x, y) ->
+                                val scaledX = x * floorPlanScale
+                                val scaledY = y * floorPlanScale
+                                // Apply rotation
+                                val angleRad = Math.toRadians(floorPlanRotationDegrees.toDouble()).toFloat()
+                                val cos = kotlin.math.cos(angleRad)
+                                val sin = kotlin.math.sin(angleRad)
+                                val rotatedX = scaledX * cos - scaledY * sin
+                                val rotatedY = scaledX * sin + scaledY * cos
+                                Offset(rotatedX, rotatedY)
+                            }
+
+                            // Draw filled polygon with light blue color
+                            if (transformedPoints.isNotEmpty()) {
+                                drawPath(
+                                    path = Path().apply {
+                                        moveTo(transformedPoints[0].x, transformedPoints[0].y)
+                                        for (i in 1 until transformedPoints.size) {
+                                            lineTo(transformedPoints[i].x, transformedPoints[i].y)
+                                        }
+                                        close()
+                                    },
+                                    color = Color(0xADD8F3FF), // Light blue color (RGBA)
+                                    style = Fill
+                                )
+                            }
+                        }
+                    }
+
+                    // NOW draw the floor plan walls on top
                     for (wall in walls) {
                         val x1 = wall.x1 * floorPlanScale
                         val y1 = wall.y1 * floorPlanScale

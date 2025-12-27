@@ -144,10 +144,13 @@ class MainActivity : ComponentActivity() {
      * - UI never directly accesses repositories (only ViewModels)
      */
     private fun initializeRepositories() {
-        // Floor Plan Repository - loads wall data from assets
+        // Floor Plan Repository - loads wall and stairwell data from assets
         floorPlanRepository = FloorPlanRepository(application)
         val walls = floorPlanRepository.loadFloorPlan()
         floorPlanViewModel.loadWalls(walls)
+        
+        val stairwells = floorPlanRepository.loadStairwells()
+        floorPlanViewModel.loadStairwells(stairwells)
 
         // PDR Repository - handles path calculation
         pdrRepository = PdrRepository()
