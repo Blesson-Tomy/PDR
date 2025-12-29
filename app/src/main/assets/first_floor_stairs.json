@@ -1,0 +1,410 @@
+[
+  {
+    "x1": 666,
+    "y1": 1504,
+    "x2": 666,
+    "y2": 1775,
+    "type": "stair",
+    "stair_polygon_id": 1,
+    "floors_connected": [
+      1,
+      2
+    ]
+  },
+  {
+    "x1": 816,
+    "y1": 94,
+    "x2": 816,
+    "y2": 219,
+    "type": "stair",
+    "stair_polygon_id": 2,
+    "floors_connected": [
+      0,
+      0.3
+    ]
+  },
+  {
+    "x1": 816,
+    "y1": 1504,
+    "x2": 816,
+    "y2": 1776,
+    "type": "stair",
+    "stair_polygon_id": 1,
+    "floors_connected": [
+      1,
+      2
+    ]
+  },
+  {
+    "x1": 1512,
+    "y1": 650,
+    "x2": 1512,
+    "y2": 808,
+    "type": "stair",
+    "stair_polygon_id": 3,
+    "floors_connected": [
+      1,
+      2
+    ]
+  },
+  {
+    "x1": 1785,
+    "y1": 650,
+    "x2": 1786,
+    "y2": 808,
+    "type": "stair",
+    "stair_polygon_id": 3,
+    "floors_connected": [
+      1,
+      2
+    ]
+  },
+  {
+    "x1": 1512,
+    "y1": 650,
+    "x2": 1785,
+    "y2": 650,
+    "type": "stair",
+    "stair_polygon_id": 3,
+    "floors_connected": [
+      1,
+      2
+    ]
+  },
+  {
+    "x1": 121,
+    "y1": 808,
+    "x2": 238,
+    "y2": 808,
+    "type": "stair",
+    "stair_polygon_id": 4,
+    "floors_connected": [
+      0,
+      0.3
+    ]
+  },
+  {
+    "x1": 1512,
+    "y1": 808,
+    "x2": 1786,
+    "y2": 808,
+    "type": "stair",
+    "stair_polygon_id": 3,
+    "floors_connected": [
+      1,
+      2
+    ]
+  },
+  {
+    "x1": 666,
+    "y1": 1504,
+    "x2": 816,
+    "y2": 1504,
+    "type": "stair",
+    "stair_polygon_id": 1,
+    "floors_connected": [
+      1,
+      2
+    ]
+  },
+  {
+    "x1": 666,
+    "y1": 1775,
+    "x2": 816,
+    "y2": 1776,
+    "type": "stair",
+    "stair_polygon_id": 1,
+    "floors_connected": [
+      1,
+      2
+    ]
+  },
+  {
+    "x1": 1512,
+    "y1": 936,
+    "x2": 948,
+    "y2": 1504,
+    "type": "stair",
+    "stair_polygon_id": 5,
+    "floors_connected": [
+      0.6,
+      1
+    ]
+  },
+  {
+    "x1": 880,
+    "y1": 1437,
+    "x2": 1450,
+    "y2": 872,
+    "type": "stair",
+    "stair_polygon_id": 5,
+    "floors_connected": [
+      0.6,
+      1
+    ]
+  },
+  {
+    "x1": 568,
+    "y1": 353,
+    "x2": 816,
+    "y2": 94,
+    "type": "stair",
+    "stair_polygon_id": 2,
+    "floors_connected": [
+      0,
+      0.3
+    ]
+  },
+  {
+    "x1": 121,
+    "y1": 808,
+    "x2": 371,
+    "y2": 560,
+    "type": "stair",
+    "stair_polygon_id": 4,
+    "floors_connected": [
+      0,
+      0.3
+    ]
+  },
+  {
+    "x1": 1891,
+    "y1": 1685,
+    "x2": 2106,
+    "y2": 1906,
+    "type": "stair",
+    "stair_polygon_id": 6,
+    "floors_connected": [
+      0,
+      1
+    ]
+  },
+  {
+    "x1": 1689,
+    "y1": 1886,
+    "x2": 1909,
+    "y2": 2102,
+    "type": "stair",
+    "stair_polygon_id": 6,
+    "floors_connected": [
+      0,
+      1
+    ]
+  },
+  {
+    "x1": 910,
+    "y1": 1100,
+    "x2": 715,
+    "y2": 905,
+    "type": "stair",
+    "stair_polygon_id": 7,
+    "floors_connected": [
+      0.3,
+      0.6
+    ]
+  },
+  {
+    "x1": 1909,
+    "y1": 2102,
+    "x2": 2106,
+    "y2": 1906,
+    "type": "stair",
+    "stair_polygon_id": 6,
+    "floors_connected": [
+      0,
+      1
+    ]
+  },
+  {
+    "x1": 1689,
+    "y1": 1886,
+    "x2": 1891,
+    "y2": 1685,
+    "type": "stair",
+    "stair_polygon_id": 6,
+    "floors_connected": [
+      0,
+      1
+    ]
+  },
+  {
+    "x1": 568,
+    "y1": 353,
+    "x2": 761,
+    "y2": 549,
+    "type": "stair",
+    "stair_polygon_id": 2,
+    "floors_connected": [
+      0,
+      0.3
+    ]
+  },
+  {
+    "x1": 1293,
+    "y1": 710,
+    "x2": 1107,
+    "y2": 518,
+    "type": "stair",
+    "stair_polygon_id": 8,
+    "floors_connected": [
+      0.3,
+      0.6
+    ]
+  },
+  {
+    "x1": 562,
+    "y1": 751,
+    "x2": 371,
+    "y2": 560,
+    "type": "stair",
+    "stair_polygon_id": 4,
+    "floors_connected": [
+      0,
+      0.3
+    ]
+  },
+  {
+    "x1": 1112,
+    "y1": 903,
+    "x2": 922,
+    "y2": 710,
+    "type": "stair",
+    "stair_polygon_id": 8,
+    "floors_connected": [
+      0.3,
+      0.6
+    ]
+  },
+  {
+    "x1": 528,
+    "y1": 1092,
+    "x2": 719,
+    "y2": 1279,
+    "type": "stair",
+    "stair_polygon_id": 7,
+    "floors_connected": [
+      0.3,
+      0.6
+    ]
+  },
+  {
+    "x1": 949,
+    "y1": 356,
+    "x2": 761,
+    "y2": 549,
+    "type": "stair",
+    "stair_polygon_id": 2,
+    "floors_connected": [
+      0,
+      0.3
+    ]
+  },
+  {
+    "x1": 1293,
+    "y1": 710,
+    "x2": 1112,
+    "y2": 903,
+    "type": "stair",
+    "stair_polygon_id": 8,
+    "floors_connected": [
+      0.3,
+      0.6
+    ]
+  },
+  {
+    "x1": 528,
+    "y1": 1092,
+    "x2": 715,
+    "y2": 905,
+    "type": "stair",
+    "stair_polygon_id": 7,
+    "floors_connected": [
+      0.3,
+      0.6
+    ]
+  },
+  {
+    "x1": 719,
+    "y1": 1279,
+    "x2": 910,
+    "y2": 1100,
+    "type": "stair",
+    "stair_polygon_id": 7,
+    "floors_connected": [
+      0.3,
+      0.6
+    ]
+  },
+  {
+    "x1": 371,
+    "y1": 939,
+    "x2": 562,
+    "y2": 751,
+    "type": "stair",
+    "stair_polygon_id": 4,
+    "floors_connected": [
+      0,
+      0.3
+    ]
+  },
+  {
+    "x1": 1107,
+    "y1": 518,
+    "x2": 922,
+    "y2": 710,
+    "type": "stair",
+    "stair_polygon_id": 8,
+    "floors_connected": [
+      0.3,
+      0.6
+    ]
+  },
+  {
+    "x1": 816,
+    "y1": 219,
+    "x2": 949,
+    "y2": 356,
+    "type": "stair",
+    "stair_polygon_id": 2,
+    "floors_connected": [
+      0,
+      0.3
+    ]
+  },
+  {
+    "x1": 238,
+    "y1": 808,
+    "x2": 371,
+    "y2": 939,
+    "type": "stair",
+    "stair_polygon_id": 4,
+    "floors_connected": [
+      0,
+      0.3
+    ]
+  },
+  {
+    "x1": 948,
+    "y1": 1504,
+    "x2": 880,
+    "y2": 1437,
+    "type": "stair",
+    "stair_polygon_id": 5,
+    "floors_connected": [
+      0.6,
+      1
+    ]
+  },
+  {
+    "x1": 1450,
+    "y1": 872,
+    "x2": 1512,
+    "y2": 936,
+    "type": "stair",
+    "stair_polygon_id": 5,
+    "floors_connected": [
+      0.6,
+      1
+    ]
+  }
+]
