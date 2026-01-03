@@ -167,12 +167,8 @@ class MainActivity : ComponentActivity() {
         floorPlanRepository = FloorPlanRepository(application)
         floorPlanViewModel.floorPlanRepository = floorPlanRepository
         
-        // Load static data for now (stairs and entrances from assets)
-        val stairwells = floorPlanRepository.loadStairwells()
-        floorPlanViewModel.loadStairwells(stairwells)
-        
-        val entrances = floorPlanRepository.loadEntrances()
-        floorPlanViewModel.loadEntrances(entrances)
+        // NOTE: Walls, stairs, and entrances are now loaded from Firestore
+        // when user selects a building/floor in BuildingSelector
 
         // PDR Repository - handles path calculation
         pdrRepository = PdrRepository()
