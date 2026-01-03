@@ -5,15 +5,33 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.pdr.model.Wall
 import com.example.pdr.model.Stairwell
 import com.example.pdr.model.Entrance
+import com.example.pdr.repository.FloorPlanRepository
+import kotlinx.coroutines.launch
 
 /**
  * Manages UI state for the floor plan.
- * Data loading is handled by FloorPlanRepository.
+ * Handles building/floor selection and async data loading.
  */
 class FloorPlanViewModel : ViewModel() {
+
+    var floorPlanRepository: FloorPlanRepository? = null
+
+    // Building and floor selection
+    var buildings by mutableStateOf<List<String>>(emptyList())
+    var floors by mutableStateOf<List<String>>(emptyList())
+    var selectedBuilding by mutableStateOf<String?>(null)
+    var selectedFloor by mutableStateOf<String?>(null)
+    
+    // Loading states
+    var isLoadingBuildings by mutableStateOf(false)
+    var isLoadingFloors by mutableStateOf(false)
+    var isLoadingWalls by mutableStateOf(false)
+    var errorMessage by mutableStateOf<String?>(null)
+    var isDataLoaded by mutableStateOf(false)
 
     // Floor plan data (loaded by repository)
     val walls = mutableStateListOf<Wall>()
@@ -27,6 +45,93 @@ class FloorPlanViewModel : ViewModel() {
     var isSettingOrigin by mutableStateOf(false)
     var floorPlanScale by mutableStateOf("0.62")
     var floorPlanRotation by mutableStateOf("0.00")
+
+    /**
+     * Fetches all available building names from Firestore.
+     */
+    fun fetchBuildingNames() {
+        isLoadingBuildings = true
+        errorMessage = null
+        
+        viewModelScope.launch {
+            try {
+                val buildingNames = floorPlanRepository?.fetchBuildingNames() ?: emptyList()
+                buildings = buildingNames
+                isLoadingBuildings = false
+            } catch (e: Exception) {
+                errorMessage = "Failed to fetch buildings: ${e.message}"
+                isLoadingBuildings = false
+            }
+        }
+    }
+
+    /**
+     * Fetches floor names for the selected building.
+     */
+    fun fetchFloorNames(buildingName: String) {
+        isLoadingFloors = true
+        errorMessage = null
+        
+        viewModelScope.launch {
+            try {
+                val floorNames = floorPlanRepository?.fetchFloorNames(buildingName) ?: emptyList()
+                floors = floorNames
+                isLoadingFloors = false
+            } catch (e: Exception) {
+                errorMessage = "Failed to fetch floors: ${e.message}"
+                isLoadingFloors = false
+            }
+        }
+    }
+
+    /**
+     * Loads walls data from Firestore for a specific building and floor.
+     */
+    fun loadWallsFromFirestore(buildingName: String, floorName: String) {
+        isLoadingWalls = true
+        errorMessage = null
+        
+        viewModelScope.launch {
+            try {
+                val loadedWalls = floorPlanRepository?.loadWallsFromFirestore(buildingName, floorName) ?: emptyList()
+                
+                loadWalls(loadedWalls)
+                isLoadingWalls = false
+                isDataLoaded = true
+            } catch (e: Exception) {
+                errorMessage = "Failed to load walls: ${e.message}"
+                isLoadingWalls = false
+            }
+        }
+    }
+
+    /**
+     * Loads stairs data from Firestore for a specific building and floor.
+     */
+    fun loadStairwellsFromFirestore(buildingName: String, floorName: String) {
+        viewModelScope.launch {
+            try {
+                val loadedStairwells = floorPlanRepository?.loadStairwellsFromFirestore(buildingName, floorName) ?: emptyList()
+                loadStairwells(loadedStairwells)
+            } catch (e: Exception) {
+                errorMessage = "Failed to load stairs: ${e.message}"
+            }
+        }
+    }
+
+    /**
+     * Loads entrances data from Firestore for a specific building and floor.
+     */
+    fun loadEntrancesFromFirestore(buildingName: String, floorName: String) {
+        viewModelScope.launch {
+            try {
+                val loadedEntrances = floorPlanRepository?.loadEntrancesFromFirestore(buildingName, floorName) ?: emptyList()
+                loadEntrances(loadedEntrances)
+            } catch (e: Exception) {
+                errorMessage = "Failed to load entrances: ${e.message}"
+            }
+        }
+    }
 
     /**
      * Loads walls data from repository.
@@ -59,4 +164,3 @@ class FloorPlanViewModel : ViewModel() {
         isSettingOrigin = !isSettingOrigin
     }
 }
-

@@ -8,6 +8,8 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.core.view.WindowCompat
 import com.example.pdr.model.StepDetector
 import com.example.pdr.model.HeadingDetector
@@ -16,6 +18,7 @@ import com.example.pdr.repository.PdrRepository
 import com.example.pdr.repository.MotionRepository
 import com.example.pdr.repository.FloorPlanRepository
 import com.example.pdr.ui.MainScreen
+import com.example.pdr.ui.components.BuildingSelector
 import com.example.pdr.ui.theme.PDRTheme
 import com.example.pdr.viewmodel.FloorPlanViewModel
 import com.example.pdr.viewmodel.MotionViewModel
@@ -69,14 +72,30 @@ class MainActivity : ComponentActivity() {
         // Set the main UI content of the activity.
         setContent {
             PDRTheme {
-                // Observe ViewModel changes and sync with detectors
-                ObserveSettingsChanges()
+                // Track if data has been loaded
+                val isDataLoaded = remember { mutableStateOf(floorPlanViewModel.isDataLoaded) }
                 
-                // NEW: Observe motion events for floor transitions
-                ObserveMotionEvents()
+                // Observe floor plan data loading state
+                LaunchedEffect(floorPlanViewModel.isDataLoaded) {
+                    isDataLoaded.value = floorPlanViewModel.isDataLoaded
+                }
                 
-                // The MainScreen composable is the root of the UI, passing in the required ViewModels.
-                MainScreen(stepViewModel, motionViewModel, floorPlanViewModel)
+                if (isDataLoaded.value) {
+                    // Show main app with data loaded
+                    // Observe ViewModel changes and sync with detectors
+                    ObserveSettingsChanges()
+                    
+                    // NEW: Observe motion events for floor transitions
+                    ObserveMotionEvents()
+                    
+                    // The MainScreen composable is the root of the UI, passing in the required ViewModels.
+                    MainScreen(stepViewModel, motionViewModel, floorPlanViewModel)
+                } else {
+                    // Show building selector to load data from Firestore
+                    BuildingSelector(floorPlanViewModel) {
+                        isDataLoaded.value = true
+                    }
+                }
             }
         }
     }
@@ -144,11 +163,11 @@ class MainActivity : ComponentActivity() {
      * - UI never directly accesses repositories (only ViewModels)
      */
     private fun initializeRepositories() {
-        // Floor Plan Repository - loads wall, stairwell, and entrance data from assets
+        // Floor Plan Repository - loads wall, stairwell, and entrance data from Firestore
         floorPlanRepository = FloorPlanRepository(application)
-        val walls = floorPlanRepository.loadFloorPlan()
-        floorPlanViewModel.loadWalls(walls)
+        floorPlanViewModel.floorPlanRepository = floorPlanRepository
         
+        // Load static data for now (stairs and entrances from assets)
         val stairwells = floorPlanRepository.loadStairwells()
         floorPlanViewModel.loadStairwells(stairwells)
         

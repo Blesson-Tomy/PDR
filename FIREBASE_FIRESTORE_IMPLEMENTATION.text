@@ -1,0 +1,236 @@
+# Firestore Implementation for Floor Plan Data
+
+## Overview
+This document describes the implementation of loading wall data from Firebase Firestore with local caching for the PDR (Pedestrian Dead Reckoning) application.
+
+## Architecture
+
+### Data Flow
+1. **User launches app** → Building selector screen appears
+2. **Fetch building names** from Firestore (`/buildings`)
+3. **User selects building** → Fetch floor names from Firestore (`/buildings/{buildingName}/floors`)
+4. **User selects floor** → Load walls from Firestore (`/buildings/{buildingName}/floors/{floorName}/walls`)
+5. **Data cached locally** in SharedPreferences
+6. **Main app loads** with floor plan displayed
+
+### Firestore Structure
+```
+/buildings
+  /{buildingName}
+    /floors
+      /{floorName}
+        /walls
+          /wall1
+            {x1, y1, x2, y2, type, ...}
+          /wall2
+            {x1, y1, x2, y2, type, ...}
+          ...
+```
+
+## Key Components
+
+### 1. FloorPlanRepository Updates
+**File**: `app/src/main/java/com/example/pdr/repository/FloorPlanRepository.kt`
+
+**New Methods**:
+- `fetchBuildingNames()` - Fetches all buildings from Firestore
+- `fetchFloorNames(buildingName)` - Fetches all floors for a building
+- `loadWallsFromFirestore(buildingName, floorName)` - Loads walls and caches them
+- `loadWallsFromCache(buildingName, floorName)` - Retrieves cached walls (fallback)
+- `clearCache(buildingName, floorName)` - Clears cache for specific data
+- `clearAllCache()` - Clears all cached data
+
+**Features**:
+- Automatic caching in SharedPreferences after successful Firestore fetch
+- Fallback to cache if Firestore fails (offline support)
+- Error handling with exception logging
+
+### 2. FloorPlanViewModel Updates
+**File**: `app/src/main/java/com/example/pdr/viewmodel/FloorPlanViewModel.kt`
+
+**New Properties**:
+```kotlin
+// Building/floor selection
+var selectedBuilding: String?
+var selectedFloor: String?
+var buildings: List<String>
+var floors: List<String>
+
+// Loading states
+var isLoadingBuildings: Boolean
+var isLoadingFloors: Boolean
+var isLoadingWalls: Boolean
+var isDataLoaded: Boolean
+var errorMessage: String?
+```
+
+**New Methods**:
+- `fetchBuildingNames()` - Initiates async fetch from repository
+- `fetchFloorNames(buildingName)` - Initiates async fetch from repository
+- `loadWallsFromFirestore(buildingName, floorName)` - Initiates async load from repository
+
+### 3. BuildingSelector Composable
+**File**: `app/src/main/java/com/example/pdr/ui/components/BuildingSelector.kt`
+
+**Features**:
+- Dropdown menus for building and floor selection
+- Loading indicators during data fetch
+- Error message display
+- Load button disabled until both building and floor are selected
+- Auto-navigates to main app when data loads
+
+**UI Flow**:
+1. On load, fetch all buildings
+2. Show dropdown with building options
+3. When building selected, fetch floors for that building
+4. Show dropdown with floor options
+5. Load button enabled when both are selected
+6. Click "Load Floor Plan" to download walls data
+7. Auto-navigate to main app
+
+### 4. MainActivity Updates
+**File**: `app/src/main/java/com/example/pdr/MainActivity.kt`
+
+**Key Changes**:
+- Building selector shown first (`isDataLoaded == false`)
+- Main app shown after data loads (`isDataLoaded == true`)
+- Repository injected into ViewModel during initialization
+- Static data (stairs, entrances) still loaded from assets
+
+## Usage
+
+### Prerequisites
+1. Firebase project configured with Firestore
+2. Valid Google Services configuration (`google-services.json`)
+3. Firestore rules allowing read access (or proper authentication)
+4. Wall data uploaded to Firestore in correct structure
+
+### First-Time User Flow
+1. App launches
+2. Building Selector appears
+3. Buildings dropdown populated automatically
+4. Select building → Floors dropdown populated
+5. Select floor → Load Floor Plan button becomes active
+6. Click "Load Floor Plan"
+7. Walls downloaded from Firestore and cached
+8. Main PDR app loads with floor plan displayed
+
+### Subsequent Uses (Offline)
+If user previously loaded building/floor:
+1. App launches
+2. If attempting to load new building/floor:
+   - Tries Firestore first
+   - Falls back to cache if network unavailable
+   - Shows error if neither available
+3. If loading same building/floor again:
+   - Serves from cache instantly (no network needed)
+
+## Dependencies Added
+**File**: `app/build.gradle.kts`
+
+```kotlin
+implementation("com.google.firebase:firebase-firestore")
+implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+```
+
+- Firestore for database access
+- Coroutines integration for async Tasks
+
+## Caching Strategy
+
+### Location
+- **Shared Preferences** (`floor_plan_cache`)
+- Key format: `walls_{buildingName}_{floorName}`
+- Cached as JSON string
+
+### When Cache is Used
+1. **Fallback**: When Firestore fetch fails
+2. **Instant loading**: When user selects previously loaded building/floor
+3. **Offline support**: When device has no network connection
+
+### Manual Cache Management
+```kotlin
+// Clear specific building/floor cache
+floorPlanRepository.clearCache("MTB", "floor1")
+
+// Clear all cached data
+floorPlanRepository.clearAllCache()
+```
+
+## Error Handling
+
+### User-Facing Errors
+- Network errors: "Failed to fetch buildings: ..."
+- Parse errors: Caught and logged
+- Missing data: Empty lists returned gracefully
+
+### Developer Logging
+- All exceptions printed via `e.printStackTrace()`
+- Use Logcat for debugging Firestore connection issues
+
+## Future Enhancements
+
+1. **Implement for Stairs & Entrances**
+   - `loadStairwellsFromFirestore()` 
+   - `loadEntrancesFromFirestore()`
+   - Same caching pattern
+
+2. **Real-Time Updates**
+   - Replace `get().await()` with `snapshots()` for live updates
+   - Useful for collaborative floor plan editing
+
+3. **Pagination**
+   - For large buildings with many walls
+   - Use Firestore query limits and pagination
+
+4. **Building/Floor Metadata**
+   - Add floor descriptions, building images
+   - Display in selector UI
+
+5. **User Preferences**
+   - Remember last selected building/floor
+   - Auto-load on app restart
+
+## Testing Firestore Structure
+
+### Sample Wall Document
+```json
+{
+  "x1": 96,
+  "y1": 808,
+  "x2": 96,
+  "y2": 4022,
+  "type": "wall"
+}
+```
+
+### Firestore Console Path
+```
+buildings/MTB/floors/floor1/walls/wall1
+```
+
+### Verify Data in Console
+1. Go to Firebase Console → Firestore Database
+2. Navigate to: buildings → MTB → floors → floor1 → walls
+3. Check that documents exist and have correct fields
+
+## Troubleshooting
+
+### Buildings Not Loading
+- Check Firestore read permissions
+- Verify collection path is `/buildings`
+- Check network connectivity
+
+### Floors Not Showing After Building Select
+- Verify building name matches Firestore path
+- Check that building has `floors` subcollection
+
+### Walls Not Loading
+- Verify floor name matches Firestore path
+- Check that floor has `walls` subcollection
+- Verify Wall class deserializes correctly
+
+### Cache Issues
+- Clear app data in Android Settings
+- Or call `clearAllCache()` from code
+- Check `floor_plan_cache` SharedPreferences in Android Studio Device Explorer
