@@ -133,8 +133,8 @@ fun CanvasControls(
  */
 fun calculateReferenceDistance(uniqueEndpoints: List<Triple<Float, Float, String>>): Float {
     return if (uniqueEndpoints.size >= 52) {
-        val point26 = uniqueEndpoints[25] // 0-indexed
-        val point52 = uniqueEndpoints[50] // 0-indexed
+        val point26 = uniqueEndpoints[81] // 0-indexed
+        val point52 = uniqueEndpoints[120] // 0-indexed
         val dx = point52.first - point26.first
         val dy = point52.second - point26.second
         val distanceInUnits = sqrt(dx * dx + dy * dy)

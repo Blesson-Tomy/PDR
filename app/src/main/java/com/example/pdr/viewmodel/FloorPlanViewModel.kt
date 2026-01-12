@@ -1,6 +1,7 @@
 package com.example.pdr.viewmodel
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -13,6 +14,13 @@ import com.example.pdr.model.Room
 /**
  * Manages UI state for the floor plan.
  * Data loading is handled by FloorPlanRepository.
+ * 
+ * MVVM ARCHITECTURE:
+ * This ViewModel holds ALL state related to floor plan rendering, including
+ * canvas transformation state (scale, offset, rotation). This ensures:
+ * - Single source of truth for canvas state
+ * - State survives configuration changes
+ * - Proper separation of concerns (UI reads from ViewModel)
  */
 class FloorPlanViewModel : ViewModel() {
 
@@ -30,6 +38,12 @@ class FloorPlanViewModel : ViewModel() {
     var isSettingOrigin by mutableStateOf(false)
     var floorPlanScale by mutableStateOf("0.62")
     var floorPlanRotation by mutableStateOf("0.00")
+
+    // Canvas transformation state (pan/zoom/rotate from user gestures)
+    var canvasScale by mutableFloatStateOf(1f)
+    var canvasOffsetX by mutableFloatStateOf(0f)
+    var canvasOffsetY by mutableFloatStateOf(0f)
+    var canvasRotation by mutableFloatStateOf(0f)
 
     /**
      * Loads walls data from repository.

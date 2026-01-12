@@ -5,10 +5,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -34,6 +31,9 @@ import kotlin.math.abs
 /**
  * The main floor plan canvas with pan/zoom/rotate gestures and all floor plan drawing logic.
  * Handles walls, stairwells, entrances, and PDR path rendering.
+ * 
+ * MVVM: Canvas transformation state is stored in FloorPlanViewModel, not locally.
+ * This allows DirectionConeOverlay to read the same state without callbacks.
  */
 @Composable
 fun FloorPlanCanvas(
@@ -41,11 +41,6 @@ fun FloorPlanCanvas(
     floorPlanViewModel: FloorPlanViewModel,
     onOriginSet: (Offset) -> Unit
 ) {
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
-    var rotation by remember { mutableFloatStateOf(0f) }
-
     val points = stepViewModel.points
     val walls = floorPlanViewModel.walls
     val stairwells = floorPlanViewModel.stairwells
@@ -128,15 +123,15 @@ fun FloorPlanCanvas(
                     detectTapGestures {
                         val centerX = size.width / 2f
                         val centerY = size.height / 2f
-                        val unpannedX = it.x - offsetX
-                        val unpannedY = it.y - offsetY
-                        val angleRad = Math.toRadians(-rotation.toDouble()).toFloat()
+                        val unpannedX = it.x - floorPlanViewModel.canvasOffsetX
+                        val unpannedY = it.y - floorPlanViewModel.canvasOffsetY
+                        val angleRad = Math.toRadians(-floorPlanViewModel.canvasRotation.toDouble()).toFloat()
                         val cos = kotlin.math.cos(angleRad)
                         val sin = kotlin.math.sin(angleRad)
                         val unrotatedX = unpannedX * cos - unpannedY * sin
                         val unrotatedY = unpannedX * sin + unpannedY * cos
-                        val unscaledX = unrotatedX / scale
-                        val unscaledY = unrotatedY / scale
+                        val unscaledX = unrotatedX / floorPlanViewModel.canvasScale
+                        val unscaledY = unrotatedY / floorPlanViewModel.canvasScale
                         val worldX = unscaledX - centerX
                         val worldY = unscaledY - centerY
                         onOriginSet(Offset(worldX, worldY))
@@ -153,11 +148,11 @@ fun FloorPlanCanvas(
                             effectiveRotationChange = 0f
                             effectiveZoom = zoom
                         }
-                        val oldScale = scale
-                        val newScale = (scale * effectiveZoom).coerceIn(0.1f, 10f)
+                        val oldScale = floorPlanViewModel.canvasScale
+                        val newScale = (floorPlanViewModel.canvasScale * effectiveZoom).coerceIn(0.1f, 10f)
                         val actualZoom = newScale / oldScale
-                        val offsetFromCentroidX = offsetX - centroid.x
-                        val offsetFromCentroidY = offsetY - centroid.y
+                        val offsetFromCentroidX = floorPlanViewModel.canvasOffsetX - centroid.x
+                        val offsetFromCentroidY = floorPlanViewModel.canvasOffsetY - centroid.y
                         val scaledOffsetFromCentroidX = offsetFromCentroidX * actualZoom
                         val scaledOffsetFromCentroidY = offsetFromCentroidY * actualZoom
                         val angleRad = Math.toRadians(effectiveRotationChange.toDouble()).toFloat()
@@ -165,19 +160,19 @@ fun FloorPlanCanvas(
                         val sin = kotlin.math.sin(angleRad)
                         val rotatedOffsetFromCentroidX = scaledOffsetFromCentroidX * cos - scaledOffsetFromCentroidY * sin
                         val rotatedOffsetFromCentroidY = scaledOffsetFromCentroidX * sin + scaledOffsetFromCentroidY * cos
-                        offsetX = centroid.x + rotatedOffsetFromCentroidX + pan.x
-                        offsetY = centroid.y + rotatedOffsetFromCentroidY + pan.y
-                        scale = newScale
-                        rotation += effectiveRotationChange
+                        floorPlanViewModel.canvasOffsetX = centroid.x + rotatedOffsetFromCentroidX + pan.x
+                        floorPlanViewModel.canvasOffsetY = centroid.y + rotatedOffsetFromCentroidY + pan.y
+                        floorPlanViewModel.canvasScale = newScale
+                        floorPlanViewModel.canvasRotation += effectiveRotationChange
                     }
                 }
             }
             .graphicsLayer(
-                scaleX = scale,
-                scaleY = scale,
-                translationX = offsetX,
-                translationY = offsetY,
-                rotationZ = rotation,
+                scaleX = floorPlanViewModel.canvasScale,
+                scaleY = floorPlanViewModel.canvasScale,
+                translationX = floorPlanViewModel.canvasOffsetX,
+                translationY = floorPlanViewModel.canvasOffsetY,
+                rotationZ = floorPlanViewModel.canvasRotation,
                 transformOrigin = TransformOrigin(0f, 0f)
             )
     ) {
@@ -196,12 +191,12 @@ fun FloorPlanCanvas(
 
             if (floorPlanViewModel.showFloorPlan) {
                 drawStairwells(stairwells, floorPlanScale, floorPlanRotationDegrees)
-                drawWalls(walls, floorPlanScale, floorPlanRotationDegrees, scale)
-                drawWallEndpoints(uniqueEndpoints, floorPlanViewModel.showPointNumbers, scale, rotation)
+                drawWalls(walls, floorPlanScale, floorPlanRotationDegrees, floorPlanViewModel.canvasScale)
+                drawWallEndpoints(uniqueEndpoints, floorPlanViewModel.showPointNumbers, floorPlanViewModel.canvasScale, floorPlanViewModel.canvasRotation)
             }
 
             if (floorPlanViewModel.showEntrances) {
-                drawEntrances(entrances, floorPlanScale, floorPlanRotationDegrees, scale, rotation)
+                drawEntrances(entrances, floorPlanScale, floorPlanRotationDegrees, floorPlanViewModel.canvasScale, floorPlanViewModel.canvasRotation)
             }
 
             if (floorPlanViewModel.showRoomLabels) {
@@ -209,8 +204,8 @@ fun FloorPlanCanvas(
                     floorPlanViewModel.rooms,
                     floorPlanScale,
                     floorPlanRotationDegrees,
-                    scale,
-                    rotation
+                    floorPlanViewModel.canvasScale,
+                    floorPlanViewModel.canvasRotation
                 )
             }
 
@@ -386,3 +381,5 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPdrPath(
         drawCircle(color = Color.Red, radius = 10f, center = p)
     }
 }
+
+

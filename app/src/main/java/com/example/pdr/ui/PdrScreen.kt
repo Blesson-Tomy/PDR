@@ -8,6 +8,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.pdr.ui.components.CanvasControls
 import com.example.pdr.ui.components.CompassOverlay
+import com.example.pdr.ui.components.DirectionConeOverlay
 import com.example.pdr.ui.components.FloorPlanCanvas
 import com.example.pdr.ui.components.StatsPanel
 import com.example.pdr.ui.components.calculateReferenceDistance
@@ -20,9 +21,12 @@ import com.example.pdr.viewmodel.StepViewModel
  * 
  * Structure:
  * - FloorPlanCanvas: Main interactive canvas with walls, stairwells, entrances, and PDR path
+ * - DirectionConeOverlay: Separate overlay for direction indicator (only redraws on heading change)
  * - StatsPanel: Motion and stride statistics (top-left)
  * - CompassOverlay: Heading and direction indicator (top-right)
  * - CanvasControls: Origin setting and canvas control buttons (bottom-center)
+ * 
+ * MVVM: Canvas transformation state managed in FloorPlanViewModel (single source of truth).
  */
 @Composable
 fun PdrScreen(
@@ -74,6 +78,13 @@ fun PdrScreen(
             stepViewModel = stepViewModel,
             floorPlanViewModel = floorPlanViewModel,
             onOriginSet = { offset -> stepViewModel.setNewOrigin(offset) }
+        )
+
+        // Direction cone overlay (separate to avoid redrawing entire canvas on heading changes)
+        DirectionConeOverlay(
+            lastPoint = stepViewModel.points.lastOrNull(),
+            heading = stepViewModel.heading,
+            floorPlanViewModel = floorPlanViewModel
         )
 
         // Stats panel (top-left)
