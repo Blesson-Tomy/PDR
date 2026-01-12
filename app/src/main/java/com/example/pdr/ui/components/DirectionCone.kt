@@ -57,10 +57,9 @@ fun DirectionConeOverlay(
         val vertexX = lastPoint.x
         val vertexY = lastPoint.y
 
-        // Adjust heading by canvas rotation so cone points in absolute heading direction
         // heading is already in radians from HeadingDetector (azimuth -π to π)
-        val adjustedHeading = heading - Math.toRadians(floorPlanViewModel.canvasRotation.toDouble()).toFloat()
-        val angleRad = adjustedHeading
+        // graphicsLayer rotation will rotate the cone along with the canvas
+        val angleRad = heading
 
         // Tip of the cone (forward direction)
         val tipX = vertexX + coneLength * sin(angleRad)
