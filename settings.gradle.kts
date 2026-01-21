@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "PDR"
 include(":app")
+include(":location")

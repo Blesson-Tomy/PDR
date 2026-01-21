@@ -10,6 +10,7 @@ import com.example.pdr.model.Wall
 import com.example.pdr.model.Stairwell
 import com.example.pdr.model.Entrance
 import com.example.pdr.repository.FloorPlanRepository
+import com.example.pdr.location.LocationService
 import kotlinx.coroutines.launch
 
 /**
@@ -30,6 +31,7 @@ class FloorPlanViewModel : ViewModel() {
     var isLoadingBuildings by mutableStateOf(false)
     var isLoadingFloors by mutableStateOf(false)
     var isLoadingWalls by mutableStateOf(false)
+    var isLocatingBuilding by mutableStateOf(false)
     var errorMessage by mutableStateOf<String?>(null)
     var isDataLoaded by mutableStateOf(false)
 
@@ -162,5 +164,54 @@ class FloorPlanViewModel : ViewModel() {
      */
     fun toggleIsSettingOrigin() {
         isSettingOrigin = !isSettingOrigin
+    }
+
+    /**
+     * Attempts to automatically select a building based on the device's current location.
+     */
+    fun autoSelectBuilding(locationService: LocationService) {
+        if (isLocatingBuilding) return
+        
+        isLocatingBuilding = true
+        errorMessage = null
+        
+        viewModelScope.launch {
+            try {
+                // 1. Fetch buildings with location data
+                val buildingsWithLoc = floorPlanRepository?.fetchBuildingsWithLocation() ?: emptyList()
+                
+                if (buildingsWithLoc.isEmpty()) {
+                    // Fallback to just names if no location data found, but we can't geolocate
+                    fetchBuildingNames()
+                    isLocatingBuilding = false
+                    return@launch
+                }
+                
+                // Update the names list regardless
+                buildings = buildingsWithLoc.map { it.id } // Using ID as name for now
+                
+                // 2. Get current location
+                val currentLoc = locationService.getCurrentLocation()
+                
+                if (currentLoc != null) {
+                    // 3. Find closest
+                    val closest = locationService.findNearestBuilding(currentLoc, buildingsWithLoc)
+                    
+                    if (closest != null) {
+                        selectedBuilding = closest.id
+                        // Automatically fetch floors for this building
+                        fetchFloorNames(closest.id)
+                    } else {
+                        errorMessage = "No buildings found nearby"
+                    }
+                } else {
+                    errorMessage = "Could not determine location"
+                }
+            } catch (e: Exception) {
+                errorMessage = "Location error: ${e.message}"
+            } finally {
+                isLocatingBuilding = false
+            }
+        }
     }
 }

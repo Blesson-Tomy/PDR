@@ -14,6 +14,8 @@ import java.io.InputStreamReader
 import java.io.File
 import kotlinx.coroutines.tasks.await
 
+import com.example.pdr.location.BuildingLocation
+
 /**
  * Repository for floor plan data.
  * Responsible for loading wall and stairwell data from Firestore or JSON assets with caching.
@@ -275,6 +277,41 @@ class FloorPlanRepository(private val application: Application) {
         return try {
             val snapshot = db.collection("buildings").get().await()
             snapshot.documents.mapNotNull { it.id }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    /**
+     * Fetches all buildings with their location metadata from Firestore.
+     * 
+     * @return A list of BuildingLocation objects.
+     */
+    suspend fun fetchBuildingsWithLocation(): List<BuildingLocation> {
+        return try {
+            val snapshot = db.collection("buildings").get().await()
+            snapshot.documents.mapNotNull { doc ->
+                try {
+                    val lat = doc.getDouble("latitude")
+                    val lng = doc.getDouble("longitude")
+                    val radius = doc.getDouble("radius")?.toFloat() ?: 50f
+                    
+                    if (lat != null && lng != null) {
+                        BuildingLocation(
+                            id = doc.id,
+                            name = doc.getString("name") ?: doc.id,
+                            latitude = lat,
+                            longitude = lng,
+                            radius = radius
+                        )
+                    } else {
+                        null
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()

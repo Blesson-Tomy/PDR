@@ -15,6 +15,7 @@ import com.example.pdr.viewmodel.FloorPlanViewModel
 @Composable
 fun BuildingSelector(
     viewModel: FloorPlanViewModel,
+    onLocateClicked: () -> Unit,
     onDataLoaded: () -> Unit
 ) {
     LaunchedEffect(Unit) {
@@ -35,15 +36,27 @@ fun BuildingSelector(
             modifier = Modifier.padding(bottom = 32.dp)
         )
 
-        // Error message display
-        viewModel.errorMessage?.let { error ->
-            Text(
-                text = error,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
+        // GPS Location Button
+        OutlinedButton(
+            onClick = onLocateClicked,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            enabled = !viewModel.isLocatingBuilding
+        ) {
+            if (viewModel.isLocatingBuilding) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Locating...")
+            } else {
+                Text("Find Nearby Building (GPS)")
+            }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Building dropdown
         if (viewModel.isLoadingBuildings) {

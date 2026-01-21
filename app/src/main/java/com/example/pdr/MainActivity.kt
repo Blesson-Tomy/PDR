@@ -33,10 +33,16 @@ import com.example.pdr.viewmodel.StepViewModel
  * 3. MainActivity wires everything together during initialization
  * 4. Composables read ViewModel state (no need to know about repositories)
  */
+import androidx.activity.result.contract.ActivityResultContracts
+import com.example.pdr.location.LocationService
+
 class MainActivity : ComponentActivity() {
 
     // The system service that provides access to the device's sensors.
     private lateinit var sensorManager: SensorManager
+    
+    // Services
+    private lateinit var locationService: LocationService
     
     // ViewModels (now pure UI state holders + StateFlow collectors)
     private val stepViewModel: StepViewModel by viewModels()
@@ -52,6 +58,23 @@ class MainActivity : ComponentActivity() {
     private var stepDetector: StepDetector? = null
     private var headingDetector: HeadingDetector? = null
 
+    // Permission launcher for location
+    private val locationPermissionRequest = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        when {
+            permissions.getOrDefault(android.Manifest.permission.ACCESS_FINE_LOCATION, false) ||
+            permissions.getOrDefault(android.Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
+                // Precise or approximate location access granted.
+                floorPlanViewModel.autoSelectBuilding(locationService)
+            }
+            else -> {
+                // No location access granted.
+                floorPlanViewModel.errorMessage = "Location permission denied"
+            }
+        }
+    }
+
     /**
      * Called when the activity is first created. This is where most of the initialization happens.
      */
@@ -63,6 +86,9 @@ class MainActivity : ComponentActivity() {
         // Get an instance of the SensorManager.
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
 
+        // Initialize Location Service
+        locationService = LocationService(this)
+
         // Initialize repositories (these emit StateFlows)
         initializeRepositories()
         
@@ -72,8 +98,8 @@ class MainActivity : ComponentActivity() {
         // Set the main UI content of the activity.
         setContent {
             PDRTheme {
-                // Track if data has been loaded
-                val isDataLoaded = remember { mutableStateOf(floorPlanViewModel.isDataLoaded) }
+                // Track if data has been loaded from Firestore
+                val isDataLoaded = remember { mutableStateOf(false) }
                 
                 // Observe floor plan data loading state
                 LaunchedEffect(floorPlanViewModel.isDataLoaded) {
@@ -92,9 +118,18 @@ class MainActivity : ComponentActivity() {
                     MainScreen(stepViewModel, motionViewModel, floorPlanViewModel)
                 } else {
                     // Show building selector to load data from Firestore
-                    BuildingSelector(floorPlanViewModel) {
-                        isDataLoaded.value = true
-                    }
+                    BuildingSelector(
+                        viewModel = floorPlanViewModel,
+                        onLocateClicked = {
+                            locationPermissionRequest.launch(arrayOf(
+                                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                android.Manifest.permission.ACCESS_COARSE_LOCATION
+                            ))
+                        },
+                        onDataLoaded = {
+                            isDataLoaded.value = true
+                        }
+                    )
                 }
             }
         }
